@@ -226,8 +226,25 @@ export const setVersion = (name: string, version: 1 | 2) =>
 export const shutdown = () => run(['--shutdown']);
 export const unregister = (name: string) => run(['--unregister', name]);
 
-/** Runs `true` inside the distro, which is enough for WSL to boot it. */
-export const start = (name: string) => run(['--distribution', name, '--exec', '/bin/true']);
+/**
+ * Boots the distro and keeps it running.
+ *
+ * WSL stops a distro about 15 s after its last wsl.exe session ends, even with
+ * systemd, so booting it with a command that exits right away would undo
+ * "Start" moments later. After booting (which surfaces errors), a detached,
+ * idle session keeps it alive, outliving VS Code, until Stop, Restart, or
+ * shutdown ends it. A loop of long sleeps works on every distro, busybox too.
+ */
+export async function start(name: string): Promise<void> {
+	await run(['--distribution', name, '--exec', '/bin/true']);
+	const keepAlive = spawn(
+		wslExePath(),
+		['--distribution', name, '--exec', '/bin/sh', '-c', 'while :; do sleep 3600; done'],
+		{ detached: true, stdio: 'ignore', windowsHide: true, env: { ...process.env, WSL_UTF8: '1' } },
+	);
+	keepAlive.on('error', () => undefined);
+	keepAlive.unref();
+}
 
 export function exportDistro(name: string, target: string, vhd: boolean) {
 	return run(['--export', name, target, ...(vhd ? ['--vhd'] : [])]);

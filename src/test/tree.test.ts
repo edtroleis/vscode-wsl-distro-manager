@@ -25,8 +25,23 @@ describe('DistroItem', () => {
 		assert.equal(new DistroItem(distro({ isDefault: true })).description, 'default · WSL 2 · Running');
 	});
 
-	it('uses a stable id so refreshes keep it expanded', () => {
-		assert.equal(new DistroItem(distro()).id, new DistroItem(distro({ running: false })).id);
+	it('keeps its id across refreshes while the state is unchanged', () => {
+		assert.equal(new DistroItem(distro()).id, new DistroItem(distro()).id);
+	});
+
+	it('changes its id with the state, so VS Code redraws the icon color', () => {
+		assert.notEqual(new DistroItem(distro()).id, new DistroItem(distro({ running: false })).id);
+	});
+
+	it('colors the icon green only while running', () => {
+		const color = (d: Distro) => (new DistroItem(d).iconPath as { color?: { id: string } }).color?.id;
+		assert.equal(color(distro()), 'charts.green');
+		assert.equal(color(distro({ running: false })), undefined);
+	});
+
+	it('restores expansion given by the provider', () => {
+		assert.equal(new DistroItem(distro(), true).collapsibleState, 2);
+		assert.equal(new DistroItem(distro()).collapsibleState, 1);
 	});
 });
 

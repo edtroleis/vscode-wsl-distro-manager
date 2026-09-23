@@ -22,7 +22,7 @@ official extension does not: start/stop, `--set-default`, export/import,
 | Details on expand: OS, kernel, user, disk, location, VHDX size | registry `HKCU\...\Lxss`; `wsl -d <d> -e sh` only if the distro is already running |
 | Live CPU, memory, and process count (expanded, running distro) | `sh` loop over `/proc` via `wsl -d <d> -e` |
 | Compact the VHDX to reclaim disk space | `fstrim`, `wsl --terminate`, then `diskpart compact vdisk` (UAC prompt) |
-| Start / Stop / Restart | `wsl -d <d> -e /bin/true`, `wsl --terminate <d>` |
+| Start / Stop / Restart | `wsl -d <d> -e /bin/true` + a detached idle session, `wsl --terminate <d>` |
 | Set default distro | `wsl --set-default <d>` |
 | Convert WSL 1 ⇄ WSL 2 | `wsl --set-version <d> <n>` |
 | Export / Import (`.tar` or `.vhdx`) | `wsl --export` / `wsl --import` |
@@ -132,6 +132,11 @@ share one kernel, every other running distro loses the ability to run `.exe`
 files. Running `wsl.exe` then fails with shell errors instead of a clear message.
 When the extension runs inside WSL and this happens, it reports the problem and
 the one-line fix (re-registering `WSLInterop`).
+
+**7. Started distros stop on their own.** WSL stops a distro about 15 seconds
+after its last `wsl.exe` session ends, even with systemd. *Start* therefore boots
+the distro and leaves a detached, idle `sleep` session running in it, which keeps
+it up (even after VS Code closes) until *Stop*, *Restart*, or a shutdown.
 
 ## Development
 

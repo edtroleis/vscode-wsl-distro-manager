@@ -38,6 +38,8 @@ Windows host.
 
 - [ ] The **WSL Distro Manager** icon appears in the activity bar and lists every distro.
 - [ ] Expanding a stopped distro shows details without starting it (it stays **Stopped**).
+- [ ] *Start* turns the icon green and the distro is still running a minute later; *Stop* turns it gray.
+- [ ] A distro started outside VS Code (e.g. Windows Terminal) turns green within the refresh interval.
 - [ ] Expanding a running distro shows CPU, memory, and processes updating every ~2 s.
 - [ ] Collapsing it, or hiding the view, stops the updates (rows show **paused**).
 - [ ] The **VHDX** row of a running distro shows reclaimable space when it is over 1 GB.

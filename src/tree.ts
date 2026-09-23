@@ -8,10 +8,16 @@ import { Distro, isCurrentWindowDistro, list, managedBy, registryInfo, runtimeIn
 const RECLAIMABLE_THRESHOLD = 1024 ** 3;
 
 export class DistroItem extends vscode.TreeItem {
-	constructor(readonly distro: Distro) {
-		super(distro.name, vscode.TreeItemCollapsibleState.Collapsed);
-		// A stable id keeps the expanded state across automatic refreshes.
-		this.id = `distro/${distro.name}`;
+	constructor(readonly distro: Distro, expanded = false) {
+		super(
+			distro.name,
+			expanded ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed,
+		);
+		// The id is stable across refreshes (keeping selection and expansion) but
+		// changes with the state: for an existing id VS Code updates the icon shape
+		// and not its color, so a distro that started stayed gray. The provider
+		// restores expansion across that change.
+		this.id = `distro/${distro.name}/${distro.running ? 'running' : 'stopped'}`;
 
 		// "wslDistro.<state>[.managed]": menus hide config actions on managed distros.
 		const managed = managedBy(distro.name);
@@ -142,6 +148,9 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 	 */
 	private readonly monitors = new Map<string, DistroMonitor>();
 
+	/** Expanded distros by name, since a state change gives the item a new id. */
+	private readonly expanded = new Set<string>();
+
 	refresh(): void {
 		this.changed.fire();
 	}
@@ -164,7 +173,9 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 			const showManaged = vscode.workspace
 				.getConfiguration('wslManager')
 				.get<boolean>('showManagedDistros', true);
-			return distros.filter((d) => showManaged || !managedBy(d.name)).map((d) => new DistroItem(d));
+			return distros
+				.filter((d) => showManaged || !managedBy(d.name))
+				.map((d) => new DistroItem(d, this.expanded.has(d.name)));
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			return [new MessageItem(`Failed to query wsl.exe: ${message}`, 'error')];
@@ -302,11 +313,13 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 			// Re-expanding an already loaded node does not call getChildren again.
 			view.onDidExpandElement((e) => {
 				if (e.element instanceof DistroItem) {
+					this.expanded.add(e.element.distro.name);
 					this.startMonitor(e.element.distro);
 				}
 			}),
 			view.onDidCollapseElement((e) => {
 				if (e.element instanceof DistroItem) {
+					this.expanded.delete(e.element.distro.name);
 					this.monitors.get(e.element.distro.name)?.stop();
 				}
 			}),

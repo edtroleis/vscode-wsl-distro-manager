@@ -12,6 +12,7 @@ Initial release.
 - Open a terminal (default user or root) or a new VS Code window connected to a distro.
 - Edit `/etc/wsl.conf` (as root) and the global `.wslconfig`, with a prompt to apply changes on save.
 - Distros created by Docker Desktop, Podman, and Rancher Desktop are labeled, hidden from configuration actions, and protected by warnings; they can also be hidden from the list.
+- *Start* keeps the distro running; WSL would otherwise stop it about 15 seconds later.
 - Actions that would disconnect the current window always ask first, even with confirmations turned off.
 - A clear error, with the fix, when Windows interop was unregistered by another distro stopping.
 - Export and import work from windows connected to WSL, where file dialogs return Linux paths.
