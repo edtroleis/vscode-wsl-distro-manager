@@ -1,4 +1,5 @@
 import { ChildProcess, spawn } from 'child_process';
+import * as fsSync from 'fs';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
@@ -52,6 +53,30 @@ export interface RunResult {
 	code: number;
 }
 
+export const INTEROP_BROKEN_MESSAGE =
+	'Windows interop is disabled in this distro, so it cannot run wsl.exe. This is a known WSL issue: ' +
+	'when another distro that uses systemd stops, it unregisters interop for every distro. Restore it with: ' +
+	'sudo sh -c "echo :WSLInterop:M::MZ::/init:PF > /proc/sys/fs/binfmt_misc/register" ' +
+	'(or restart WSL from Windows).';
+
+/**
+ * On the Linux host, Windows programs run through a binfmt_misc entry that WSL
+ * registers as WSLInterop (or WSLInterop-late). Without it, exec falls back to
+ * running the .exe as a shell script, which fails with confusing messages.
+ */
+export function interopBroken(binfmtDir = '/proc/sys/fs/binfmt_misc'): boolean {
+	if (process.platform === 'win32') {
+		return false;
+	}
+	try {
+		const entries = fsSync.readdirSync(binfmtDir);
+		// Only judge when binfmt_misc is mounted (it always has "register").
+		return entries.includes('register') && !entries.some((e) => e.startsWith('WSLInterop'));
+	} catch {
+		return false;
+	}
+}
+
 function spawnCapture(
 	command: string,
 	args: string[],
@@ -74,7 +99,9 @@ function spawnCapture(
 				stderr: decode(Buffer.concat(err)),
 				code: code ?? -1,
 			};
-			if (result.code === 0 || opts.tolerateFailure) {
+			if (result.code !== 0 && command.toLowerCase().endsWith('.exe') && interopBroken()) {
+				reject(new Error(INTEROP_BROKEN_MESSAGE));
+			} else if (result.code === 0 || opts.tolerateFailure) {
 				resolve(result);
 			} else {
 				const message = (result.stderr || result.stdout).trim();
@@ -477,4 +504,38 @@ async function toWindowsHostPath(hostPath: string): Promise<string> {
 		return hostPath;
 	}
 	return (await spawnCapture('wslpath', ['-w', hostPath])).stdout.trim();
+}
+
+/**
+ * Whether Windows can open the file exclusively. A VHDX stays attached to the
+ * WSL VM, and therefore locked, while the VM runs: on current WSL versions even
+ * after its own distro stops, as long as any other distro is running.
+ */
+export async function isFileLocked(windowsPath: string): Promise<boolean> {
+	const quoted = windowsPath.replace(/'/g, "''");
+	const result = await spawnCapture(
+		powershellPath(),
+		[
+			'-NoProfile',
+			'-NonInteractive',
+			'-Command',
+			`try { $f = [IO.File]::Open('${quoted}', 'Open', 'Read', 'None'); $f.Close(); 'FREE' } catch { 'LOCKED' }`,
+		],
+		{ cwd: process.platform === 'win32' ? undefined : '/mnt/c', tolerateFailure: true },
+	);
+	return !result.stdout.includes('FREE');
+}
+
+/** Polls until the file is free or the timeout passes; returns whether it got free. */
+export async function waitUntilUnlocked(windowsPath: string, timeoutMs: number): Promise<boolean> {
+	const deadline = Date.now() + timeoutMs;
+	for (;;) {
+		if (!(await isFileLocked(windowsPath))) {
+			return true;
+		}
+		if (Date.now() >= deadline) {
+			return false;
+		}
+		await new Promise((r) => setTimeout(r, 1000));
+	}
 }

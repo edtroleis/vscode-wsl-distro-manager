@@ -137,6 +137,33 @@ export async function confirmRestartIfCurrentWindow(distro: string): Promise<boo
 	return choice === 'Restart';
 }
 
+/**
+ * Always asks: a shutdown stops every distro, including ones this window or
+ * other tools (Docker, Podman) depend on, and those are not restarted for them.
+ */
+async function confirmShutdownForCompaction(distro: string, running: string[]): Promise<boolean> {
+	const managed = running.filter((name) => wsl.managedBy(name));
+	const detail = [
+		`WSL keeps the disk of "${distro}" attached while any distro is running.`,
+		running.length > 0
+			? `Running now: ${running.join(', ')}. They will be stopped` +
+				(running.length > managed.length ? ' and started again after the compaction.' : '.')
+			: '',
+		managed.length > 0
+			? `${managed.join(', ')} ${managed.length === 1 ? 'belongs' : 'belong'} to ${[
+					...new Set(managed.map((name) => wsl.managedBy(name)?.tool)),
+				].join(' / ')} and will not be restarted; start ${managed.length === 1 ? 'it' : 'them'} from that tool.`
+			: '',
+		vscode.env.remoteName === 'wsl' ? WINDOW_WARNING : '',
+	].filter(Boolean);
+	const choice = await vscode.window.showWarningMessage(
+		`Shut down WSL to compact "${distro}"?`,
+		{ modal: true, detail: detail.join('\n\n') },
+		'Shut Down and Compact',
+	);
+	return choice === 'Shut Down and Compact';
+}
+
 function withProgress<T>(title: string, task: () => Promise<T>): Thenable<T> {
 	return vscode.window.withProgress(
 		{ location: vscode.ProgressLocation.Notification, title, cancellable: false },
@@ -453,47 +480,73 @@ export function registerCommands(
 			return;
 		}
 
-		const result = await vscode.window.withProgress(
-			{ location: vscode.ProgressLocation.Notification, title: `Compacting ${distro.name}` },
-			async (progress) => {
+		// Distros to start again at the end: this one, or everything a shutdown stopped.
+		let toRestart = distro.running ? [distro.name] : [];
+		const restart = async () => {
+			for (const name of toRestart) {
+				await wsl.start(name).catch(() => undefined);
+			}
+		};
+
+		try {
+			const free = await withProgress(`Compacting ${distro.name}: releasing the disk...`, async () => {
 				if (distro.running) {
 					// WSL mounts with discard, so this mostly catches leftovers; it is cheap.
-					progress.report({ message: 'trimming free space...' });
 					await wsl.run(
 						['--distribution', distro.name, '--user', 'root', '--exec', '/bin/sh', '-c', 'fstrim -a'],
 						{ tolerateFailure: true },
 					);
-					progress.report({ message: 'stopping the distro...' });
 					await wsl.terminate(distro.name);
 				}
-				progress.report({ message: 'waiting for administrator permission and running diskpart...' });
-				try {
-					return await wsl.compactVhd(vhd);
-				} finally {
-					if (distro.running) {
-						progress.report({ message: 'starting the distro again...' });
-						await wsl.start(distro.name).catch(() => undefined);
-					}
-				}
-			},
-		);
-		tree.invalidateDetails();
-		tree.refresh();
+				return wsl.waitUntilUnlocked(vhd, 5000);
+			});
 
-		if (result.code !== 0) {
-			const tail = result.log.trim().split(/\r?\n/).slice(-3).join(' ');
-			throw new Error(
-				`diskpart failed (exit code ${result.code}): ${tail}. ` +
-					'If the disk is still in use, run "Shut Down WSL" and try again.',
+			if (!free) {
+				// Current WSL keeps every VHDX attached while its VM runs, i.e. while
+				// any distro runs. Only a full shutdown releases it.
+				const running = (await wsl.list()).filter((d) => d.running).map((d) => d.name);
+				if (process.platform !== 'win32') {
+					throw new Error(
+						`The disk of "${distro.name}" stays attached while WSL is running, and shutting WSL down ` +
+							'would stop this extension, which runs inside WSL. Run Compact Disk from a local VS Code ' +
+							'window (not connected to WSL).',
+					);
+				}
+				if (!(await confirmShutdownForCompaction(distro.name, running))) {
+					return;
+				}
+				toRestart = [...new Set([...toRestart, ...running])].filter((name) => !wsl.managedBy(name));
+				const released = await withProgress('Shutting down WSL...', async () => {
+					await wsl.shutdown();
+					return wsl.waitUntilUnlocked(vhd, 15000);
+				});
+				if (!released) {
+					throw new Error(`The disk of "${distro.name}" is still in use by another program.`);
+				}
+			}
+
+			const result = await withProgress(
+				`Compacting ${distro.name}: waiting for administrator permission and running diskpart...`,
+				() => wsl.compactVhd(vhd),
 			);
+			if (result.code !== 0) {
+				const tail = result.log.trim().split(/\r?\n/).slice(-3).join(' ');
+				throw new Error(`diskpart failed (exit code ${result.code}): ${tail}`);
+			}
+			const sizeAfter = (await fs.stat(vhdHost)).size;
+			const saved = sizeBefore - sizeAfter;
+			vscode.window.showInformationMessage(
+				saved > 0
+					? `"${distro.name}" compacted: ${formatBytes(sizeBefore)} → ${formatBytes(sizeAfter)} (${formatBytes(saved)} reclaimed).`
+					: `"${distro.name}" was already compact (${formatBytes(sizeAfter)}).`,
+			);
+		} finally {
+			if (toRestart.length > 0) {
+				await withProgress(`Starting ${toRestart.join(', ')} again...`, restart);
+			}
+			tree.invalidateDetails();
+			tree.refresh();
 		}
-		const sizeAfter = (await fs.stat(vhdHost)).size;
-		const saved = sizeBefore - sizeAfter;
-		vscode.window.showInformationMessage(
-			saved > 0
-				? `"${distro.name}" compacted: ${formatBytes(sizeBefore)} → ${formatBytes(sizeAfter)} (${formatBytes(saved)} reclaimed).`
-				: `"${distro.name}" was already compact (${formatBytes(sizeAfter)}).`,
-		);
 	});
 
 	register('wslManager.copyName', async (arg: unknown) => {

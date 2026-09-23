@@ -47,6 +47,13 @@ give back, with an inline **Compact Disk** button.
 Compacting stops the distro, asks Windows for administrator permission (UAC) to
 run `diskpart`, and starts the distro again if it was running.
 
+Current WSL versions keep **every** distro's disk attached to the WSL VM while
+any distro is running, even disks of distros that have stopped. When that is the
+case, the extension lists the running distros and asks to shut WSL down; after
+compacting, it starts them again (except Docker/Podman/Rancher distros, which
+must be started from their tool). Run compaction from a local VS Code window: a
+window connected to WSL would be disconnected by the shutdown.
+
 ### Distros managed by other tools
 
 Distros created by **Docker Desktop** (`docker-desktop`, `docker-desktop-data`),
@@ -114,6 +121,13 @@ PID namespace, so summing `/proc/<pid>/stat` inside a distro gives that distro's
 usage. One long-lived `sh` loop per expanded distro streams samples instead of
 spawning `wsl.exe` on every tick. Memory is the sum of process RSS, so shared
 pages are counted more than once.
+
+**6. Interop can vanish.** When a distro that uses systemd stops, its
+`systemd-binfmt` unregisters the `WSLInterop` binfmt entry, and since all distros
+share one kernel, every other running distro loses the ability to run `.exe`
+files. Running `wsl.exe` then fails with shell errors instead of a clear message.
+When the extension runs inside WSL and this happens, it reports the problem and
+the one-line fix (re-registering `WSLInterop`).
 
 ## Development
 

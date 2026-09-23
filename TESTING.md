@@ -50,7 +50,8 @@ Windows host.
 - [ ] *Import* of that file under a new name creates a working distro; *Unregister* removes it.
 - [ ] *Compact Disk* on a distro you can spare:
   - [ ] Declining the UAC prompt shows an error and leaves the distro as it was.
-  - [ ] Accepting it compacts the disk, reports the before/after size, and restarts the distro if it was running.
+  - [ ] With another distro running, it explains that WSL must shut down, lists the running distros, and offers **Shut Down and Compact**.
+  - [ ] Accepting it compacts the disk, reports the before/after size, and restarts the distros that were running (not Podman/Docker ones).
 
 ## 4. Manual checks (window connected to WSL)
 

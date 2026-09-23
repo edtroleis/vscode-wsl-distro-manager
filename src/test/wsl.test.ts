@@ -3,6 +3,7 @@ import { afterEach, describe, it } from 'node:test';
 import {
 	currentWindowDistro,
 	decode,
+	interopBroken,
 	isCurrentWindowDistro,
 	isInsideDistro,
 	linuxToWindowsPath,
@@ -12,6 +13,9 @@ import {
 	parseRuntimeInfo,
 	toWindowsPath,
 } from '../wsl';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { Uri, env, workspace } from './vscode.mock';
 
 /** wsl.exe output as it arrives on stdout: UTF-16LE, CRLF, no BOM. */
@@ -315,5 +319,30 @@ describe('managedBy', () => {
 
 	it('explains how to manage the distro instead', () => {
 		assert.match(managedBy('podman-machine-default')?.hint ?? '', /podman machine/);
+	});
+});
+
+describe('interopBroken', { skip: process.platform === 'win32' }, () => {
+	function binfmt(...entries: string[]): string {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'binfmt-'));
+		entries.forEach((e) => fs.writeFileSync(path.join(dir, e), ''));
+		return dir;
+	}
+
+	it('is false while the WSLInterop entry is registered', () => {
+		assert.equal(interopBroken(binfmt('register', 'status', 'WSLInterop')), false);
+	});
+
+	it('accepts the WSLInterop-late entry used by newer WSL versions', () => {
+		assert.equal(interopBroken(binfmt('register', 'status', 'WSLInterop-late')), false);
+	});
+
+	it('is true when another distro unregistered it', () => {
+		assert.equal(interopBroken(binfmt('register', 'status')), true);
+	});
+
+	it('does not guess when binfmt_misc is not mounted', () => {
+		assert.equal(interopBroken(binfmt()), false);
+		assert.equal(interopBroken('/nonexistent/binfmt_misc'), false);
 	});
 });

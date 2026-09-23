@@ -76,6 +76,7 @@ async function main(): Promise<void> {
 		}
 		const vhd = path.win32.join(entry.basePath, entry.vhdFileName);
 		await check('VHDX size', async () => (await fs.stat(await wsl.toHostPath(vhd))).size, (b) => `${(b / 1024 ** 3).toFixed(1)} GB`);
+		await check('VHDX locked by the WSL VM', () => wsl.isFileLocked(vhd), (locked) => (locked ? 'yes' : 'no'));
 		if (!distro.running) {
 			console.log('  --    stopped: skipping in-distro queries');
 			continue;
