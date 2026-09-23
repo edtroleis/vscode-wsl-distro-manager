@@ -1,4 +1,3 @@
-import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import * as wsl from './wsl';
@@ -65,6 +64,43 @@ async function confirmDestructive(message: string, confirmLabel: string): Promis
 		confirmLabel,
 	);
 	return choice === confirmLabel;
+}
+
+const WINDOW_WARNING =
+	'This VS Code window is connected to it and will be disconnected.';
+
+/**
+ * Like confirmDestructive, but when the action hits the distro this window is
+ * connected to, always asks (even with confirmations turned off) and says so:
+ * the window loses its connection, and the extension may be running inside it.
+ */
+async function confirmDistroAction(
+	distro: string,
+	message: string,
+	confirmLabel: string,
+): Promise<boolean> {
+	if (!wsl.isCurrentWindowDistro(distro)) {
+		return confirmDestructive(message, confirmLabel);
+	}
+	const choice = await vscode.window.showWarningMessage(
+		message,
+		{ modal: true, detail: `"${distro}" is the distro of this window. ${WINDOW_WARNING}` },
+		confirmLabel,
+	);
+	return choice === confirmLabel;
+}
+
+/** Confirms restarting the current window's distro; any other distro passes through. */
+export async function confirmRestartIfCurrentWindow(distro: string): Promise<boolean> {
+	if (!wsl.isCurrentWindowDistro(distro)) {
+		return true;
+	}
+	const choice = await vscode.window.showWarningMessage(
+		`Restart "${distro}"?`,
+		{ modal: true, detail: `"${distro}" is the distro of this window. ${WINDOW_WARNING}` },
+		'Restart',
+	);
+	return choice === 'Restart';
 }
 
 function withProgress<T>(title: string, task: () => Promise<T>): Thenable<T> {
@@ -142,7 +178,8 @@ export function registerCommands(
 		if (!distro) {
 			return;
 		}
-		const ok = await confirmDestructive(
+		const ok = await confirmDistroAction(
+			distro.name,
 			`Stop "${distro.name}"? Processes running in this distro will be killed.`,
 			'Stop',
 		);
@@ -158,7 +195,8 @@ export function registerCommands(
 		if (!distro) {
 			return;
 		}
-		const ok = await confirmDestructive(
+		const ok = await confirmDistroAction(
+			distro.name,
 			`Restart "${distro.name}"? Running processes will be killed.`,
 			'Restart',
 		);
@@ -188,7 +226,8 @@ export function registerCommands(
 			return;
 		}
 		const target = distro.version === 2 ? 1 : 2;
-		const ok = await confirmDestructive(
+		const ok = await confirmDistroAction(
+			distro.name,
 			`Convert "${distro.name}" from WSL ${distro.version} to WSL ${target}? ` +
 				'The conversion copies the entire file system and may take several minutes.',
 			`Convert to WSL ${target}`,
@@ -207,24 +246,28 @@ export function registerCommands(
 		if (!distro) {
 			return;
 		}
+		const home = await wsl.dialogHomeUri();
 		const target = await vscode.window.showSaveDialog({
 			title: `Export ${distro.name}`,
-			defaultUri: vscode.Uri.file(path.join(os.homedir(), `${distro.name}.tar`)),
+			defaultUri: vscode.Uri.joinPath(home, `${distro.name}.tar`),
 			filters: { 'Tarball': ['tar'], 'Virtual disk': ['vhdx'] },
 		});
 		if (!target) {
 			return;
 		}
-		const isVhd = target.fsPath.toLowerCase().endsWith('.vhdx');
+		const targetPath = await wsl.toWindowsPath(target);
+		const isVhd = targetPath.toLowerCase().endsWith('.vhdx');
 		await withProgress(`Exporting ${distro.name}...`, () =>
-			wsl.exportDistro(distro.name, target.fsPath, isVhd),
+			wsl.exportDistro(distro.name, targetPath, isVhd),
 		);
-		vscode.window.showInformationMessage(`"${distro.name}" exported to ${target.fsPath}`);
+		vscode.window.showInformationMessage(`"${distro.name}" exported to ${targetPath}`);
 	});
 
 	register('wslManager.import', async () => {
+		const home = await wsl.dialogHomeUri();
 		const sources = await vscode.window.showOpenDialog({
 			title: 'Select the exported file',
+			defaultUri: home,
 			canSelectMany: false,
 			filters: { 'Exported distro': ['tar', 'vhdx'], 'All files': ['*'] },
 		});
@@ -232,11 +275,12 @@ export function registerCommands(
 		if (!source) {
 			return;
 		}
+		const sourcePath = await wsl.toWindowsPath(source);
 
 		const existing = new Set((await wsl.list()).map((d) => d.name.toLowerCase()));
 		const name = await vscode.window.showInputBox({
 			title: 'Name of the new distro',
-			value: path.parse(source.fsPath).name,
+			value: path.win32.parse(sourcePath).name,
 			validateInput: (value) => {
 				const trimmed = value.trim();
 				if (!trimmed) {
@@ -257,6 +301,7 @@ export function registerCommands(
 
 		const dirs = await vscode.window.showOpenDialog({
 			title: 'Folder where the distro disk will be created',
+			defaultUri: home,
 			canSelectFiles: false,
 			canSelectFolders: true,
 			canSelectMany: false,
@@ -265,10 +310,18 @@ export function registerCommands(
 		if (!installDir) {
 			return;
 		}
+		const installPath = await wsl.toWindowsPath(installDir);
+		// The new distro's VHDX must live on a Windows drive, not inside another distro.
+		if (wsl.isInsideDistro(installPath)) {
+			vscode.window.showErrorMessage(
+				`Cannot install into ${installPath}. Choose a folder on a Windows drive (for example under /mnt/c or C:\\).`,
+			);
+			return;
+		}
 
-		const isVhd = source.fsPath.toLowerCase().endsWith('.vhdx');
+		const isVhd = sourcePath.toLowerCase().endsWith('.vhdx');
 		await withProgress(`Importing ${name.trim()}...`, () =>
-			wsl.importDistro(name.trim(), installDir.fsPath, source.fsPath, isVhd),
+			wsl.importDistro(name.trim(), installPath, sourcePath, isVhd),
 		);
 		vscode.window.showInformationMessage(`Distro "${name.trim()}" imported.`);
 		tree.refresh();
@@ -282,7 +335,10 @@ export function registerCommands(
 		// Unregister deletes the whole disk and cannot be undone: require typing the name.
 		const typed = await vscode.window.showInputBox({
 			title: `Permanently unregister "${distro.name}"`,
-			prompt: `This deletes ALL data in "${distro.name}". Type the name to confirm.`,
+			prompt:
+				`This deletes ALL data in "${distro.name}". ` +
+				(wsl.isCurrentWindowDistro(distro.name) ? `${WINDOW_WARNING} ` : '') +
+				'Type the name to confirm.',
 			placeHolder: distro.name,
 			validateInput: (value) =>
 				value === distro.name ? undefined : `Type exactly: ${distro.name}`,
@@ -296,11 +352,13 @@ export function registerCommands(
 	});
 
 	register('wslManager.shutdown', async () => {
-		const ok = await confirmDestructive(
+		const message =
 			'Shut down WSL? Every running distro will be stopped immediately, ' +
-				'including VS Code windows connected to them.',
-			'Shut Down WSL',
-		);
+			'including VS Code windows connected to them.';
+		const current = wsl.currentWindowDistro();
+		const ok = current
+			? await confirmDistroAction(current, message, 'Shut Down WSL')
+			: await confirmDestructive(message, 'Shut Down WSL');
 		if (!ok) {
 			return;
 		}

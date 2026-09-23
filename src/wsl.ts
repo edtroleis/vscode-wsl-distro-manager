@@ -294,3 +294,64 @@ export async function runtimeInfo(name: string): Promise<RuntimeInfo> {
 		.map((l) => l.trim() || undefined);
 	return { prettyName, kernel, user, diskUsed, diskSize };
 }
+
+/**
+ * Converts a URI returned by a VS Code file dialog into a path wsl.exe accepts.
+ *
+ * wsl.exe is a Windows program, so it only understands Windows paths. Dialogs
+ * return Linux paths in two cases: when the extension runs on the remote (WSL)
+ * host (`file:` URIs of the Linux filesystem), and when it runs on the Windows
+ * host but the window is connected to WSL (`vscode-remote://wsl+<distro>/...`).
+ */
+export async function toWindowsPath(uri: vscode.Uri): Promise<string> {
+	if (uri.scheme === 'file') {
+		if (process.platform === 'win32') {
+			return uri.fsPath;
+		}
+		return (await spawnCapture('wslpath', ['-w', uri.path])).stdout.trim();
+	}
+	const remote = /^wsl\+(.+)$/i.exec(uri.authority);
+	if (uri.scheme === 'vscode-remote' && remote) {
+		const drive = /^\/mnt\/([a-z])(\/.*)?$/i.exec(uri.path);
+		if (drive) {
+			return `${drive[1].toUpperCase()}:${(drive[2] ?? '/').replace(/\//g, '\\')}`;
+		}
+		return `\\\\wsl.localhost\\${decodeURIComponent(remote[1])}${uri.path.replace(/\//g, '\\')}`;
+	}
+	throw new Error(`Unsupported location: ${uri.toString(true)}`);
+}
+
+/** True for paths inside a distro's filesystem (\\wsl.localhost\... or \\wsl$\...). */
+export function isInsideDistro(windowsPath: string): boolean {
+	return /^\\\\wsl(\.localhost|\$)\\/i.test(windowsPath);
+}
+
+/** Folder to open file dialogs in: the Windows user profile, as seen by this host. */
+export async function dialogHomeUri(): Promise<vscode.Uri> {
+	return vscode.Uri.file(await windowsHomeDir().catch(() => os.homedir()));
+}
+
+/**
+ * The distro this VS Code window is connected to, if any. On the remote host
+ * WSL sets WSL_DISTRO_NAME with the exact name; on the Windows host we fall back
+ * to the `wsl+<distro>` authority of the open workspace.
+ */
+export function currentWindowDistro(): string | undefined {
+	if (vscode.env.remoteName !== 'wsl') {
+		return undefined;
+	}
+	if (process.platform !== 'win32' && process.env.WSL_DISTRO_NAME) {
+		return process.env.WSL_DISTRO_NAME;
+	}
+	const uri = vscode.workspace.workspaceFile ?? vscode.workspace.workspaceFolders?.[0]?.uri;
+	const match = uri && /^wsl\+(.+)$/i.exec(uri.authority);
+	return match ? decodeURIComponent(match[1]) : undefined;
+}
+
+/**
+ * The URI authority may come back lowercased, so compare case-insensitively. At
+ * worst this warns about an extra distro, which is the safe side to err on.
+ */
+export function isCurrentWindowDistro(name: string): boolean {
+	return currentWindowDistro()?.toLowerCase() === name.toLowerCase();
+}

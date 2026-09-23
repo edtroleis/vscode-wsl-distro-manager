@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { SCHEME, WslConfigFileSystem, describe, targetDistro } from './configFs';
-import { registerCommands } from './commands';
+import { confirmRestartIfCurrentWindow, registerCommands } from './commands';
 import { DistroTreeProvider } from './tree';
 import * as wsl from './wsl';
 
@@ -45,7 +45,7 @@ async function onConfigSaved(document: vscode.TextDocument): Promise<void> {
 			`${describe(document.uri)} saved. Restart "${distro}" to apply it?`,
 			'Restart Distro',
 		);
-		if (choice) {
+		if (choice && (await confirmRestartIfCurrentWindow(distro))) {
 			await vscode.window.withProgress(
 				{ location: vscode.ProgressLocation.Notification, title: `Restarting ${distro}...` },
 				async () => {

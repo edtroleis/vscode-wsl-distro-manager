@@ -2,7 +2,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { DistroMonitor, formatBytes } from './monitor';
-import { Distro, list, registryInfo, runtimeInfo, toHostPath } from './wsl';
+import { Distro, isCurrentWindowDistro, list, registryInfo, runtimeInfo, toHostPath } from './wsl';
 
 export class DistroItem extends vscode.TreeItem {
 	constructor(readonly distro: Distro) {
@@ -15,6 +15,9 @@ export class DistroItem extends vscode.TreeItem {
 		const badges = [`WSL ${distro.version}`, distro.running ? 'Running' : 'Stopped'];
 		if (distro.isDefault) {
 			badges.unshift('default');
+		}
+		if (isCurrentWindowDistro(distro.name)) {
+			badges.unshift('this window');
 		}
 		this.description = badges.join(' · ');
 
