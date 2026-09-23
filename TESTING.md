@@ -51,6 +51,7 @@ Windows host.
 - [ ] *Compact Disk* on a distro you can spare:
   - [ ] Declining the UAC prompt shows an error and leaves the distro as it was.
   - [ ] With another distro running, it explains that WSL must shut down, lists the running distros, and offers **Shut Down and Compact**.
+  - [ ] That warning says every window connected to WSL will be disconnected, and the progress shows the elapsed time while diskpart runs.
   - [ ] Accepting it compacts the disk, reports the before/after size, and restarts the distros that were running (not Podman/Docker ones).
 
 ## 4. Manual checks (window connected to WSL)

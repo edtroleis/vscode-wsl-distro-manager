@@ -51,8 +51,12 @@ Current WSL versions keep **every** distro's disk attached to the WSL VM while
 any distro is running, even disks of distros that have stopped. When that is the
 case, the extension lists the running distros and asks to shut WSL down; after
 compacting, it starts them again (except Docker/Podman/Rancher distros, which
-must be started from their tool). Run compaction from a local VS Code window: a
-window connected to WSL would be disconnected by the shutdown.
+must be started from their tool).
+
+The shutdown disconnects **every** VS Code window and terminal connected to WSL.
+Run compaction from a local VS Code window and wait for the result before
+reconnecting: `diskpart` reports no progress, and a 50 GB disk takes a few minutes
+(the notification shows the elapsed time).
 
 ### Distros managed by other tools
 

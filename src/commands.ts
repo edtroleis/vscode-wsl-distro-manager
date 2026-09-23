@@ -154,7 +154,9 @@ async function confirmShutdownForCompaction(distro: string, running: string[]): 
 					...new Set(managed.map((name) => wsl.managedBy(name)?.tool)),
 				].join(' / ')} and will not be restarted; start ${managed.length === 1 ? 'it' : 'them'} from that tool.`
 			: '',
-		vscode.env.remoteName === 'wsl' ? WINDOW_WARNING : '',
+		'Every VS Code window and terminal connected to WSL, including this one if it is, will be ' +
+			'disconnected. Compacting a large disk can take several minutes: wait for the result ' +
+			'before reconnecting them.',
 	].filter(Boolean);
 	const choice = await vscode.window.showWarningMessage(
 		`Shut down WSL to compact "${distro}"?`,
@@ -482,6 +484,7 @@ export function registerCommands(
 
 		// Distros to start again at the end: this one, or everything a shutdown stopped.
 		let toRestart = distro.running ? [distro.name] : [];
+		let shutDown = false;
 		const restart = async () => {
 			for (const name of toRestart) {
 				await wsl.start(name).catch(() => undefined);
@@ -516,6 +519,7 @@ export function registerCommands(
 					return;
 				}
 				toRestart = [...new Set([...toRestart, ...running])].filter((name) => !wsl.managedBy(name));
+				shutDown = true;
 				const released = await withProgress('Shutting down WSL...', async () => {
 					await wsl.shutdown();
 					return wsl.waitUntilUnlocked(vhd, 15000);
@@ -525,9 +529,27 @@ export function registerCommands(
 				}
 			}
 
-			const result = await withProgress(
-				`Compacting ${distro.name}: waiting for administrator permission and running diskpart...`,
-				() => wsl.compactVhd(vhd),
+			const started = Date.now();
+			const result = await vscode.window.withProgress(
+				{
+					location: vscode.ProgressLocation.Notification,
+					title: `Compacting ${distro.name} (${formatBytes(sizeBefore)})`,
+				},
+				async (progress) => {
+					progress.report({ message: 'waiting for administrator permission...' });
+					// diskpart reports no progress; show elapsed time so a long run does not look stuck.
+					const timer = setInterval(() => {
+						const seconds = Math.round((Date.now() - started) / 1000);
+						progress.report({
+							message: `running diskpart, ${Math.floor(seconds / 60)}m ${seconds % 60}s elapsed. Large disks take several minutes.`,
+						});
+					}, 1000);
+					try {
+						return await wsl.compactVhd(vhd);
+					} finally {
+						clearInterval(timer);
+					}
+				},
 			);
 			if (result.code !== 0) {
 				const tail = result.log.trim().split(/\r?\n/).slice(-3).join(' ');
@@ -535,10 +557,11 @@ export function registerCommands(
 			}
 			const sizeAfter = (await fs.stat(vhdHost)).size;
 			const saved = sizeBefore - sizeAfter;
+			const reconnect = shutDown ? ' VS Code windows connected to WSL can reconnect now.' : '';
 			vscode.window.showInformationMessage(
-				saved > 0
+				(saved > 0
 					? `"${distro.name}" compacted: ${formatBytes(sizeBefore)} → ${formatBytes(sizeAfter)} (${formatBytes(saved)} reclaimed).`
-					: `"${distro.name}" was already compact (${formatBytes(sizeAfter)}).`,
+					: `"${distro.name}" was already compact (${formatBytes(sizeAfter)}).`) + reconnect,
 			);
 		} finally {
 			if (toRestart.length > 0) {
