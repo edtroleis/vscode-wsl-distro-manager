@@ -150,17 +150,25 @@ function lines(raw: string): string[] {
  * is always the version.
  */
 export async function list(): Promise<Distro[]> {
-	const names = lines((await run(['--list', '--quiet'])).stdout);
-	if (names.length === 0) {
+	const quiet = (await run(['--list', '--quiet'])).stdout;
+	if (lines(quiet).length === 0) {
 		return [];
 	}
 
 	// With no running distros, wsl.exe exits non-zero with an informational message.
 	const runningResult = await run(['--list', '--running', '--quiet'], { tolerateFailure: true });
-	const runningNames = new Set(runningResult.code === 0 ? lines(runningResult.stdout) : []);
-
 	const verbose = await run(['--list', '--verbose'], { tolerateFailure: true });
-	const verboseLines = lines(verbose.stdout).slice(1);
+	return parseDistroList(quiet, runningResult.code === 0 ? runningResult.stdout : '', verbose.stdout);
+}
+
+/**
+ * Pure part of list(): combines the decoded output of `--list --quiet`,
+ * `--list --running --quiet` (empty when none is running), and `--list --verbose`.
+ */
+export function parseDistroList(quiet: string, running: string, verbose: string): Distro[] {
+	const names = lines(quiet);
+	const runningNames = new Set(lines(running));
+	const verboseLines = lines(verbose).slice(1);
 
 	return names.map((name) => {
 		const row = verboseLines.find((l) => {
@@ -238,8 +246,13 @@ export async function registryInfo(): Promise<Map<string, RegistryDistro>> {
 		['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss', '/s'],
 		{ cwd: process.platform === 'win32' ? undefined : '/mnt/c', tolerateFailure: true },
 	);
+	return parseRegistry(result.stdout);
+}
+
+/** Parses `reg query ...\Lxss /s` output into one entry per distro name. */
+export function parseRegistry(stdout: string): Map<string, RegistryDistro> {
 	const byName = new Map<string, RegistryDistro>();
-	for (const block of result.stdout.split(/\r?\n\s*\r?\n/)) {
+	for (const block of stdout.split(/\r?\n\s*\r?\n/)) {
 		const values = new Map<string, string>();
 		for (const line of block.split(/\r?\n/)) {
 			const match = /^\s+(\S+)\s+REG_\w+\s+(.*)$/.exec(line);
@@ -289,7 +302,12 @@ export async function runtimeInfo(name: string): Promise<RuntimeInfo> {
 	const result = await run(['--distribution', name, '--exec', '/bin/sh', '-c', script], {
 		tolerateFailure: true,
 	});
-	const [prettyName, kernel, user, diskUsed, diskSize] = result.stdout
+	return parseRuntimeInfo(result.stdout);
+}
+
+/** One value per line, in the order the runtimeInfo() script prints them. */
+export function parseRuntimeInfo(stdout: string): RuntimeInfo {
+	const [prettyName, kernel, user, diskUsed, diskSize] = stdout
 		.split(/\r?\n/)
 		.map((l) => l.trim() || undefined);
 	return { prettyName, kernel, user, diskUsed, diskSize };
@@ -312,13 +330,18 @@ export async function toWindowsPath(uri: vscode.Uri): Promise<string> {
 	}
 	const remote = /^wsl\+(.+)$/i.exec(uri.authority);
 	if (uri.scheme === 'vscode-remote' && remote) {
-		const drive = /^\/mnt\/([a-z])(\/.*)?$/i.exec(uri.path);
-		if (drive) {
-			return `${drive[1].toUpperCase()}:${(drive[2] ?? '/').replace(/\//g, '\\')}`;
-		}
-		return `\\\\wsl.localhost\\${decodeURIComponent(remote[1])}${uri.path.replace(/\//g, '\\')}`;
+		return linuxToWindowsPath(decodeURIComponent(remote[1]), uri.path);
 	}
 	throw new Error(`Unsupported location: ${uri.toString(true)}`);
+}
+
+/** Same mapping as `wslpath -w`, for a Linux path inside `distro`. */
+export function linuxToWindowsPath(distro: string, linuxPath: string): string {
+	const drive = /^\/mnt\/([a-z])(\/.*)?$/i.exec(linuxPath);
+	if (drive) {
+		return `${drive[1].toUpperCase()}:${(drive[2] ?? '/').replace(/\//g, '\\')}`;
+	}
+	return `\\\\wsl.localhost\\${distro}${linuxPath.replace(/\//g, '\\')}`;
 }
 
 /** True for paths inside a distro's filesystem (\\wsl.localhost\... or \\wsl$\...). */

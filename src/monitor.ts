@@ -26,7 +26,7 @@ function script(intervalSeconds: number): string {
 	].join('\n');
 }
 
-interface Sample {
+export interface Sample {
 	cpuTotal: number;
 	cpuIdle: number;
 	procJiffies: number;
@@ -37,7 +37,7 @@ interface Sample {
 	ncpu: number;
 }
 
-function parse(line: string): Sample | undefined {
+export function parseSample(line: string): Sample | undefined {
 	const f = line.trim().split(/\s+/);
 	if (f[0] !== 'S' || f.length < 10) {
 		return undefined;
@@ -70,7 +70,7 @@ export function formatBytes(bytes: number): string {
 	return `${value.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
 }
 
-function bar(fraction: number): string {
+export function bar(fraction: number): string {
 	const width = 10;
 	const filled = Math.round(Math.min(Math.max(fraction, 0), 1) * width);
 	return '█'.repeat(filled) + '░'.repeat(width - filled);
@@ -130,7 +130,7 @@ export class DistroMonitor implements vscode.Disposable {
 			const lines = pending.split('\n');
 			pending = lines.pop() ?? '';
 			for (const line of lines) {
-				const sample = parse(line);
+				const sample = parseSample(line);
 				if (sample) {
 					this.apply(sample);
 				}

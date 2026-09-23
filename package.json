@@ -325,7 +325,8 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "package": "vsce package",
-    "publish": "vsce publish"
+    "publish": "vsce publish",
+    "test": "npm run compile && node --require ./out/test/setup.js --test \"out/test/**/*.test.js\""
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

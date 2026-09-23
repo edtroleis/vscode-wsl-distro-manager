@@ -103,6 +103,17 @@ window to check whether `wsl-distro-manager` loaded, and `Help > Toggle Develope
 Tools` for activation errors. After recompiling, reload the development window
 with `Ctrl+R`.
 
+Unit tests use the built-in Node.js test runner (Node 22+) with a minimal mock of
+the `vscode` module, so they run without launching VS Code:
+
+```bash
+npm test
+```
+
+They cover the parsing of `wsl.exe`, `reg.exe`, and sampling output, path
+conversion, current-window detection, and the CPU/memory math. Fixtures are real
+`wsl.exe` output, including UTF-16LE without a BOM and a localized `STATE` column.
+
 To package:
 
 ```bash
