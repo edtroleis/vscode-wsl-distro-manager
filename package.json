@@ -1,0 +1,336 @@
+{
+  "name": "wsl-distro-manager",
+  "displayName": "WSL Distro Manager",
+  "description": "Manage WSL distros from the sidebar: start/stop, live CPU and memory, default distro, export/import, shutdown, and editing of .wslconfig and /etc/wsl.conf.",
+  "version": "0.1.0",
+  "publisher": "edtroleis",
+  "license": "MIT",
+  "icon": "resources/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/edtroleis/vscode-wsl-distro-manager.git"
+  },
+  "bugs": {
+    "url": "https://github.com/edtroleis/vscode-wsl-distro-manager/issues"
+  },
+  "homepage": "https://github.com/edtroleis/vscode-wsl-distro-manager#readme",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "wsl",
+    "wsl2",
+    "windows subsystem for linux",
+    "distro",
+    "linux",
+    "wslconfig",
+    "wsl.conf"
+  ],
+  "extensionKind": [
+    "ui",
+    "workspace"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "wslManager",
+          "title": "WSL Distro Manager",
+          "icon": "resources/wsl.svg"
+        }
+      ]
+    },
+    "views": {
+      "wslManager": [
+        {
+          "id": "wslManager.distros",
+          "name": "Distros",
+          "icon": "resources/wsl.svg"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "wslManager.distros",
+        "contents": "No WSL distros found.\n[Refresh](command:wslManager.refresh)\n[Import Distro](command:wslManager.import)"
+      }
+    ],
+    "languages": [
+      {
+        "id": "ini",
+        "filenames": [
+          "wsl.conf",
+          ".wslconfig"
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "command": "wslManager.refresh",
+        "title": "Refresh",
+        "category": "WSL Distro Manager",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "wslManager.shutdown",
+        "title": "Shut Down WSL (wsl --shutdown)",
+        "category": "WSL Distro Manager",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "wslManager.editWslConfig",
+        "title": "Edit .wslconfig (Global)",
+        "category": "WSL Distro Manager",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "wslManager.import",
+        "title": "Import Distro...",
+        "category": "WSL Distro Manager",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "wslManager.openWindow",
+        "title": "Open in New VS Code Window",
+        "category": "WSL Distro Manager",
+        "icon": "$(empty-window)"
+      },
+      {
+        "command": "wslManager.openTerminal",
+        "title": "Open Terminal",
+        "category": "WSL Distro Manager",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "wslManager.openTerminalAsRoot",
+        "title": "Open Terminal as Root",
+        "category": "WSL Distro Manager"
+      },
+      {
+        "command": "wslManager.start",
+        "title": "Start",
+        "category": "WSL Distro Manager",
+        "icon": "$(play)"
+      },
+      {
+        "command": "wslManager.terminate",
+        "title": "Stop (Terminate)",
+        "category": "WSL Distro Manager",
+        "icon": "$(stop-circle)"
+      },
+      {
+        "command": "wslManager.restart",
+        "title": "Restart",
+        "category": "WSL Distro Manager",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "wslManager.setDefault",
+        "title": "Set as Default Distro",
+        "category": "WSL Distro Manager",
+        "icon": "$(star-full)"
+      },
+      {
+        "command": "wslManager.editWslConf",
+        "title": "Edit /etc/wsl.conf",
+        "category": "WSL Distro Manager",
+        "icon": "$(settings)"
+      },
+      {
+        "command": "wslManager.export",
+        "title": "Export (Backup)...",
+        "category": "WSL Distro Manager",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "wslManager.setVersion",
+        "title": "Convert to WSL 1 / WSL 2...",
+        "category": "WSL Distro Manager"
+      },
+      {
+        "command": "wslManager.unregister",
+        "title": "Unregister Distro...",
+        "category": "WSL Distro Manager",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "wslManager.copyName",
+        "title": "Copy Name",
+        "category": "WSL Distro Manager"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "wslManager.refresh",
+          "when": "view == wslManager.distros",
+          "group": "navigation@1"
+        },
+        {
+          "command": "wslManager.editWslConfig",
+          "when": "view == wslManager.distros",
+          "group": "navigation@2"
+        },
+        {
+          "command": "wslManager.shutdown",
+          "when": "view == wslManager.distros",
+          "group": "navigation@3"
+        },
+        {
+          "command": "wslManager.import",
+          "when": "view == wslManager.distros",
+          "group": "1_manage@1"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "wslManager.openWindow",
+          "when": "view == wslManager.distros && viewItem =~ /^wslDistro/",
+          "group": "inline@1"
+        },
+        {
+          "command": "wslManager.openTerminal",
+          "when": "view == wslManager.distros && viewItem =~ /^wslDistro/",
+          "group": "inline@2"
+        },
+        {
+          "command": "wslManager.start",
+          "when": "view == wslManager.distros && viewItem == wslDistro.stopped",
+          "group": "inline@3"
+        },
+        {
+          "command": "wslManager.terminate",
+          "when": "view == wslManager.distros && viewItem == wslDistro.running",
+          "group": "inline@3"
+        },
+        {
+          "command": "wslManager.openWindow",
+          "when": "view == wslManager.distros && viewItem =~ /^wslDistro/",
+          "group": "1_open@1"
+        },
+        {
+          "command": "wslManager.openTerminal",
+          "when": "view == wslManager.distros && viewItem =~ /^wslDistro/",
+          "group": "1_open@2"
+        },
+        {
+          "command": "wslManager.openTerminalAsRoot",
+          "when": "view == wslManager.distros && viewItem =~ /^wslDistro/",
+          "group": "1_open@3"
+        },
+        {
+          "command": "wslManager.start",
+          "when": "view == wslManager.distros && viewItem == wslDistro.stopped",
+          "group": "2_lifecycle@1"
+        },
+        {
+          "command": "wslManager.terminate",
+          "when": "view == wslManager.distros && viewItem == wslDistro.running",
+          "group": "2_lifecycle@1"
+        },
+        {
+          "command": "wslManager.restart",
+          "when": "view == wslManager.distros && viewItem == wslDistro.running",
+          "group": "2_lifecycle@2"
+        },
+        {
+          "command": "wslManager.setDefault",
+          "when": "view == wslManager.distros && viewItem =~ /^wslDistro/",
+          "group": "3_config@1"
+        },
+        {
+          "command": "wslManager.editWslConf",
+          "when": "view == wslManager.distros && viewItem =~ /^wslDistro/",
+          "group": "3_config@2"
+        },
+        {
+          "command": "wslManager.setVersion",
+          "when": "view == wslManager.distros && viewItem =~ /^wslDistro/",
+          "group": "3_config@3"
+        },
+        {
+          "command": "wslManager.export",
+          "when": "view == wslManager.distros && viewItem =~ /^wslDistro/",
+          "group": "4_backup@1"
+        },
+        {
+          "command": "wslManager.copyName",
+          "when": "view == wslManager.distros && viewItem =~ /^wslDistro/",
+          "group": "8_copy@1"
+        },
+        {
+          "command": "wslManager.unregister",
+          "when": "view == wslManager.distros && viewItem =~ /^wslDistro/",
+          "group": "9_danger@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "WSL Distro Manager",
+      "properties": {
+        "wslManager.wslExePath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to `wsl.exe`. Empty = auto-detect (`wsl.exe` on Windows, `/mnt/c/Windows/System32/wsl.exe` when the window is connected to WSL)."
+        },
+        "wslManager.autoRefreshSeconds": {
+          "type": "number",
+          "default": 10,
+          "minimum": 0,
+          "markdownDescription": "Interval, in seconds, for automatically refreshing the list while the view is visible. `0` disables it."
+        },
+        "wslManager.metricsIntervalSeconds": {
+          "type": "number",
+          "default": 2,
+          "minimum": 1,
+          "markdownDescription": "Sampling interval, in seconds, for the CPU and memory of an expanded distro. Sampling only runs while the distro is already running, expanded, and the view is visible."
+        },
+        "wslManager.defaultUser": {
+          "type": "string",
+          "default": "",
+          "description": "User for terminals opened in a distro. Empty = the distro's default user."
+        },
+        "wslManager.clickAction": {
+          "type": "string",
+          "enum": [
+            "expand",
+            "terminal",
+            "window",
+            "none"
+          ],
+          "enumDescriptions": [
+            "Expands the distro to show its details and configuration files.",
+            "Opens a terminal in the distro (expand it with the arrow).",
+            "Opens a new VS Code window connected to the distro (expand it with the arrow).",
+            "Does nothing; use the buttons and the context menu."
+          ],
+          "default": "expand",
+          "description": "What clicking a distro in the list does."
+        },
+        "wslManager.confirmDestructiveActions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Ask for confirmation before terminate, shutdown, and unregister."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.9.2",
+    "typescript": "^5.4.0"
+  }
+}
