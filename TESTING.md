@@ -15,13 +15,24 @@ All three must pass.
 
 ## 2. Install the package on Windows
 
+Build the package into a **Windows** folder. VS Code on Windows refuses to open
+files under `\\wsl.localhost\...` ("UNC host 'wsl.localhost' access is not
+allowed"), so a `.vsix` left inside the distro cannot be installed from there:
+
 ```bash
-npm run package
+npx vsce package --out /mnt/c/Users/<you>/Downloads/
 ```
 
-In a **local** VS Code window (not connected to WSL), run
-`Extensions: Install from VSIX...` and pick the generated `.vsix`. Reload the
-window. This is how Marketplace users run the extension: on the Windows host.
+Then, in a **local** VS Code window (not connected to WSL), run
+`Extensions: Install from VSIX...` and pick it from `Downloads`, or from WSL:
+
+```bash
+cd "/mnt/c/Program Files/Microsoft VS Code/bin" &&
+  cmd.exe /c code.cmd --install-extension 'C:\Users\<you>\Downloads\wsl-distro-manager-0.1.0.vsix' --force
+```
+
+Reload the window. This is how Marketplace users run the extension: on the
+Windows host.
 
 ## 3. Manual checks (local window)
 
