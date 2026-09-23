@@ -231,19 +231,25 @@ export const unregister = (name: string) => run(['--unregister', name]);
  *
  * WSL stops a distro about 15 s after its last wsl.exe session ends, even with
  * systemd, so booting it with a command that exits right away would undo
- * "Start" moments later. After booting (which surfaces errors), a detached,
- * idle session keeps it alive, outliving VS Code, until Stop, Restart, or
- * shutdown ends it. A loop of long sleeps works on every distro, busybox too.
+ * "Start" moments later. After booting (which surfaces errors), an idle
+ * wsl.exe session keeps it alive until Stop, Restart, or shutdown ends it.
+ *
+ * That session is launched by PowerShell's Start-Process with a hidden window:
+ * - spawning it from Node with `detached` leaves wsl.exe without a console, so
+ *   it opens a new one, which Windows 11 shows as a Windows Terminal window;
+ * - spawning it attached ties it to the extension host, and it dies with it.
+ * The sleep takes no quotes, so no command-line escaping can mangle it.
  */
 export async function start(name: string): Promise<void> {
 	await run(['--distribution', name, '--exec', '/bin/true']);
-	const keepAlive = spawn(
-		wslExePath(),
-		['--distribution', name, '--exec', '/bin/sh', '-c', 'while :; do sleep 3600; done'],
-		{ detached: true, stdio: 'ignore', windowsHide: true, env: { ...process.env, WSL_UTF8: '1' } },
+	const args = ['--distribution', name, '--exec', '/bin/sleep', '2147483647']
+		.map((a) => `'${a.replace(/'/g, "''")}'`)
+		.join(',');
+	await spawnCapture(
+		powershellPath(),
+		['-NoProfile', '-NonInteractive', '-Command', `Start-Process -FilePath wsl.exe -WindowStyle Hidden -ArgumentList ${args}`],
+		{ cwd: process.platform === 'win32' ? undefined : '/mnt/c' },
 	);
-	keepAlive.on('error', () => undefined);
-	keepAlive.unref();
 }
 
 export function exportDistro(name: string, target: string, vhd: boolean) {
