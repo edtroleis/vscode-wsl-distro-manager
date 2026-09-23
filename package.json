@@ -49,7 +49,7 @@
       "wslManager": [
         {
           "id": "wslManager.distros",
-          "name": "Distros",
+          "name": "WSL Distro Manager",
           "icon": "resources/wsl.svg"
         }
       ]
