@@ -64,14 +64,19 @@ Windows host.
 - [ ] *Export* from this window writes to the Windows path chosen in the dialog.
 - [ ] *Import* refuses an install folder under `/home` and accepts one under `/mnt/c`.
 
-## 5. Screenshots for the Marketplace
+## 5. Screenshots
 
-Save them as PNG in `images/`, about 1200 px wide, with a dark theme:
+The README uses these PNGs from `images/` (dark theme). Retake the affected ones
+when the UI changes:
 
-| File | What to show |
+| File | What it shows |
 |---|---|
-| `images/overview.png` | The view with several distros, one expanded and running, with live CPU/memory and the VHDX row showing reclaimable space. |
-| `images/context-menu.png` | The right-click menu of a distro. |
-| `images/compact.png` | The notification after a compaction (before → after). |
+| `overview.png` | Several distros, one expanded and running: live CPU/memory, details, reclaimable VHDX space, Podman labels. |
+| `context-menu.png` | The right-click menu of a distro. |
+| `compact.png` | The VHDX row with reclaimable space and the *Compact Disk* confirmation. |
+| `compact-shutdown.png` | The confirmation to shut WSL down for the compaction. |
+| `compact-progress.png` | The progress notification with the elapsed time. |
 
-Then uncomment the *Screenshots* section at the top of `README.md`.
+They are not packaged in the `.vsix`: `vsce` rewrites the README's relative image
+links to the GitHub repository, so they must be committed and pushed before
+publishing.
