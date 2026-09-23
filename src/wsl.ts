@@ -1,5 +1,7 @@
 import { ChildProcess, spawn } from 'child_process';
+import * as fs from 'fs/promises';
 import * as os from 'os';
+import * as path from 'path';
 import * as vscode from 'vscode';
 
 export interface Distro {
@@ -104,36 +106,39 @@ export function run(args: string[], opts: RunOptions = {}): Promise<RunResult> {
 	return spawnCapture(wslExePath(), args, opts);
 }
 
-let cachedWindowsHome: string | undefined;
+const windowsDirs = new Map<string, string>();
 
 /**
- * The %USERPROFILE% folder as seen by the current host.
+ * A Windows folder given by an environment variable (%USERPROFILE%, %TEMP%), as
+ * seen by the current host.
  *
  * When the extension runs on the remote (Linux) host, os.homedir() would return
  * /home/<user>, which is not where .wslconfig lives. In that case we ask Windows
  * and translate with wslpath. The /mnt/c cwd avoids the UNC path warning that
  * cmd.exe prints when invoked from inside the Linux filesystem.
  */
-export async function windowsHomeDir(): Promise<string> {
+async function windowsDir(variable: 'USERPROFILE' | 'TEMP'): Promise<string> {
 	if (process.platform === 'win32') {
-		return os.homedir();
+		return variable === 'USERPROFILE' ? os.homedir() : os.tmpdir();
 	}
-	if (cachedWindowsHome) {
-		return cachedWindowsHome;
+	const cached = windowsDirs.get(variable);
+	if (cached) {
+		return cached;
 	}
-	const profile = await spawnCapture(
-		'/mnt/c/Windows/System32/cmd.exe',
-		['/c', 'echo %USERPROFILE%'],
-		{ cwd: '/mnt/c' },
-	);
-	const windowsPath = profile.stdout.trim();
-	if (!windowsPath || windowsPath.includes('%USERPROFILE%')) {
-		throw new Error('Could not determine the Windows %USERPROFILE%.');
+	const echoed = await spawnCapture('/mnt/c/Windows/System32/cmd.exe', ['/c', `echo %${variable}%`], {
+		cwd: '/mnt/c',
+	});
+	const windowsPath = echoed.stdout.trim();
+	if (!windowsPath || windowsPath.includes(`%${variable}%`)) {
+		throw new Error(`Could not determine the Windows %${variable}%.`);
 	}
-	const translated = await spawnCapture('wslpath', ['-u', windowsPath]);
-	cachedWindowsHome = translated.stdout.trim();
-	return cachedWindowsHome;
+	const translated = (await spawnCapture('wslpath', ['-u', windowsPath])).stdout.trim();
+	windowsDirs.set(variable, translated);
+	return translated;
 }
+
+export const windowsHomeDir = () => windowsDir('USERPROFILE');
+export const windowsTempDir = () => windowsDir('TEMP');
 
 function lines(raw: string): string[] {
 	return raw
@@ -288,8 +293,10 @@ export interface RuntimeInfo {
 	prettyName?: string;
 	kernel?: string;
 	user?: string;
-	diskUsed?: string;
-	diskSize?: string;
+	/** Bytes used on the distro's root filesystem. */
+	diskUsed?: number;
+	/** Size of the distro's root filesystem, in bytes. */
+	diskSize?: number;
 }
 
 /**
@@ -298,7 +305,7 @@ export interface RuntimeInfo {
  */
 export async function runtimeInfo(name: string): Promise<RuntimeInfo> {
 	const script =
-		". /etc/os-release 2>/dev/null; echo $PRETTY_NAME; uname -r; id -un; df -Ph / | awk 'NR==2{print $3; print $2}'";
+		". /etc/os-release 2>/dev/null; echo $PRETTY_NAME; uname -r; id -un; df -Pk / | awk 'NR==2{print $3; print $2}'";
 	const result = await run(['--distribution', name, '--exec', '/bin/sh', '-c', script], {
 		tolerateFailure: true,
 	});
@@ -307,10 +314,14 @@ export async function runtimeInfo(name: string): Promise<RuntimeInfo> {
 
 /** One value per line, in the order the runtimeInfo() script prints them. */
 export function parseRuntimeInfo(stdout: string): RuntimeInfo {
-	const [prettyName, kernel, user, diskUsed, diskSize] = stdout
+	const [prettyName, kernel, user, usedKb, sizeKb] = stdout
 		.split(/\r?\n/)
 		.map((l) => l.trim() || undefined);
-	return { prettyName, kernel, user, diskUsed, diskSize };
+	const kbToBytes = (kb: string | undefined) => {
+		const value = Number(kb);
+		return kb !== undefined && Number.isFinite(value) ? value * 1024 : undefined;
+	};
+	return { prettyName, kernel, user, diskUsed: kbToBytes(usedKb), diskSize: kbToBytes(sizeKb) };
 }
 
 /**
@@ -377,4 +388,93 @@ export function currentWindowDistro(): string | undefined {
  */
 export function isCurrentWindowDistro(name: string): boolean {
 	return currentWindowDistro()?.toLowerCase() === name.toLowerCase();
+}
+
+/**
+ * Distros created and driven by other tools. Stopping, converting, or
+ * unregistering them from here breaks that tool, so the UI labels them and
+ * warns before touching them.
+ */
+const MANAGED_DISTROS: { pattern: RegExp; tool: string; hint: string }[] = [
+	{ pattern: /^docker-desktop(-data)?$/i, tool: 'Docker Desktop', hint: 'Use Docker Desktop to stop or reset it.' },
+	{ pattern: /^podman-/i, tool: 'Podman', hint: 'Use `podman machine stop` / `podman machine rm` instead.' },
+	{ pattern: /^rancher-desktop(-data)?$/i, tool: 'Rancher Desktop', hint: 'Use Rancher Desktop to stop or reset it.' },
+];
+
+export function managedBy(name: string): { tool: string; hint: string } | undefined {
+	const match = MANAGED_DISTROS.find((m) => m.pattern.test(name));
+	return match && { tool: match.tool, hint: match.hint };
+}
+
+export interface CompactResult {
+	/** diskpart exit code; 0 on success. */
+	code: number;
+	/** diskpart output, for error messages. */
+	log: string;
+}
+
+/**
+ * Compacts a dynamic VHDX with diskpart, which needs administrator rights, so
+ * Windows shows a UAC prompt. The disk must not be attached: stop the distro
+ * first. An elevated process cannot have its output piped back to us, so cmd.exe
+ * redirects diskpart's output to a log file that we read afterwards.
+ */
+export async function compactVhd(vhdWindowsPath: string): Promise<CompactResult> {
+	const tempHost = await windowsTempDir();
+	const tempWindows = await toWindowsHostPath(tempHost);
+	const id = `wsl-distro-manager-${process.pid}-${Date.now()}`;
+	const scriptName = `${id}.txt`;
+	const logName = `${id}.log`;
+
+	const script = [
+		`select vdisk file="${vhdWindowsPath}"`,
+		'attach vdisk readonly',
+		'compact vdisk',
+		'detach vdisk',
+		'exit',
+		'',
+	].join('\r\n');
+	const scriptHost = path.join(tempHost, scriptName);
+	const logHost = path.join(tempHost, logName);
+	await fs.writeFile(scriptHost, script, 'utf8');
+
+	try {
+		const scriptWindows = path.win32.join(tempWindows, scriptName);
+		const logWindows = path.win32.join(tempWindows, logName);
+		const quote = (s: string) => s.replace(/'/g, "''");
+		const command =
+			`$p = Start-Process -FilePath cmd.exe -Verb RunAs -Wait -PassThru -WindowStyle Hidden ` +
+			`-ArgumentList '/c diskpart /s "${quote(scriptWindows)}" > "${quote(logWindows)}" 2>&1'; ` +
+			'exit $p.ExitCode';
+		const result = await spawnCapture(powershellPath(), ['-NoProfile', '-NonInteractive', '-Command', command], {
+			cwd: process.platform === 'win32' ? undefined : '/mnt/c',
+			tolerateFailure: true,
+		});
+		// diskpart writes in the OEM code page; latin1 keeps the messages readable enough.
+		const log = await fs.readFile(logHost).then((b) => b.toString('latin1'), () => undefined);
+		if (log === undefined) {
+			// The elevated process never ran: the UAC prompt was declined or failed.
+			throw new Error(
+				(result.stderr || result.stdout).trim() || 'Administrator permission was not granted.',
+			);
+		}
+		return { code: result.code, log };
+	} finally {
+		await fs.rm(scriptHost, { force: true });
+		await fs.rm(logHost, { force: true });
+	}
+}
+
+function powershellPath(): string {
+	return process.platform === 'win32'
+		? 'powershell.exe'
+		: '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe';
+}
+
+/** Inverse of toHostPath(): a path on this host as Windows sees it. */
+async function toWindowsHostPath(hostPath: string): Promise<string> {
+	if (process.platform === 'win32') {
+		return hostPath;
+	}
+	return (await spawnCapture('wslpath', ['-w', hostPath])).stdout.trim();
 }

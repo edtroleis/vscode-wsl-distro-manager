@@ -7,3 +7,6 @@ tsconfig.json
 **/*.vsix
 out/test/**
 .github/**
+scripts/**
+TESTING.md
+images/**

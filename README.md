@@ -8,6 +8,12 @@ which is still what connects VS Code to a distro. This one covers what the
 official extension does not: start/stop, `--set-default`, export/import,
 `--shutdown`, resource monitoring, and editing `.wslconfig` and `/etc/wsl.conf`.
 
+<!-- Screenshots: capture them as described in TESTING.md, then uncomment.
+
+![WSL Distro Manager view with an expanded distro showing live CPU and memory](images/overview.png)
+
+-->
+
 ## Features
 
 | Action | WSL command behind it |
@@ -15,6 +21,7 @@ official extension does not: start/stop, `--set-default`, export/import,
 | List distros with state, version, and default | `wsl -l -q`, `wsl -l --running -q`, `wsl -l -v` |
 | Details on expand: OS, kernel, user, disk, location, VHDX size | registry `HKCU\...\Lxss`; `wsl -d <d> -e sh` only if the distro is already running |
 | Live CPU, memory, and process count (expanded, running distro) | `sh` loop over `/proc` via `wsl -d <d> -e` |
+| Compact the VHDX to reclaim disk space | `fstrim`, `wsl --terminate`, then `diskpart compact vdisk` (UAC prompt) |
 | Start / Stop / Restart | `wsl -d <d> -e /bin/true`, `wsl --terminate <d>` |
 | Set default distro | `wsl --set-default <d>` |
 | Convert WSL 1 ⇄ WSL 2 | `wsl --set-version <d> <n>` |
@@ -27,7 +34,26 @@ official extension does not: start/stop, `--set-default`, export/import,
 | Edit the global `.wslconfig` | `%USERPROFILE%\.wslconfig` |
 
 Destructive actions (stop, shut down, convert) ask for confirmation;
-`unregister` requires typing the distro name.
+`unregister` requires typing the distro name. Actions that would disconnect the
+current VS Code window always ask, even with confirmations turned off.
+
+### Reclaiming disk space
+
+A WSL 2 distro keeps its files in a VHDX that grows but never shrinks on its own:
+space freed inside the distro stays allocated on the Windows drive. When a
+running distro is expanded, the **VHDX** row shows how much a compaction would
+give back, with an inline **Compact Disk** button.
+
+Compacting stops the distro, asks Windows for administrator permission (UAC) to
+run `diskpart`, and starts the distro again if it was running.
+
+### Distros managed by other tools
+
+Distros created by **Docker Desktop** (`docker-desktop`, `docker-desktop-data`),
+**Podman** (`podman-*`), and **Rancher Desktop** are labeled with the tool's name.
+Configuration actions are hidden for them, and stopping or unregistering one always
+warns first, since doing so from here can break that tool. Set
+`wslManager.showManagedDistros` to `false` to hide them.
 
 After saving `wsl.conf` or `.wslconfig`, the extension offers the step that
 applies it: restarting the distro or running `wsl --shutdown`.
@@ -37,6 +63,7 @@ applies it: restarting the distro or running `wsl --shutdown`.
 | Key | Default | Description |
 |---|---|---|
 | `wslManager.clickAction` | `expand` | What clicking a distro does: `expand` (details), `terminal`, `window`, or `none`. |
+| `wslManager.showManagedDistros` | `true` | Show Docker Desktop, Podman, and Rancher Desktop distros. |
 | `wslManager.metricsIntervalSeconds` | `2` | CPU/memory sampling interval for an expanded distro. |
 | `wslManager.autoRefreshSeconds` | `10` | Automatic refresh while the view is visible. `0` disables it. |
 | `wslManager.defaultUser` | `""` | User for opened terminals. Empty = the distro's default. |
@@ -111,8 +138,20 @@ npm test
 ```
 
 They cover the parsing of `wsl.exe`, `reg.exe`, and sampling output, path
-conversion, current-window detection, and the CPU/memory math. Fixtures are real
-`wsl.exe` output, including UTF-16LE without a BOM and a localized `STATE` column.
+conversion, current-window detection, managed-distro detection, and the
+CPU/memory math. Fixtures are real `wsl.exe` output, including UTF-16LE without a
+BOM and a localized `STATE` column.
+
+A read-only smoke test calls the real functions against your WSL installation.
+From a WSL shell, `smoke:windows` also runs it (and the unit tests) on the
+Windows host, using the Node.js runtime bundled with VS Code:
+
+```bash
+npm run smoke            # on this host
+npm run smoke:windows    # on the Windows host, from WSL
+```
+
+See [TESTING.md](TESTING.md) for the manual checklist before a release.
 
 To package:
 

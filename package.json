@@ -148,6 +148,12 @@
         "icon": "$(cloud-upload)"
       },
       {
+        "command": "wslManager.compact",
+        "title": "Compact Disk...",
+        "category": "WSL Distro Manager",
+        "icon": "$(fold)"
+      },
+      {
         "command": "wslManager.setVersion",
         "title": "Convert to WSL 1 / WSL 2...",
         "category": "WSL Distro Manager"
@@ -200,12 +206,12 @@
         },
         {
           "command": "wslManager.start",
-          "when": "view == wslManager.distros && viewItem == wslDistro.stopped",
+          "when": "view == wslManager.distros && viewItem =~ /^wslDistro\\.stopped/",
           "group": "inline@3"
         },
         {
           "command": "wslManager.terminate",
-          "when": "view == wslManager.distros && viewItem == wslDistro.running",
+          "when": "view == wslManager.distros && viewItem =~ /^wslDistro\\.running/",
           "group": "inline@3"
         },
         {
@@ -225,38 +231,43 @@
         },
         {
           "command": "wslManager.start",
-          "when": "view == wslManager.distros && viewItem == wslDistro.stopped",
+          "when": "view == wslManager.distros && viewItem =~ /^wslDistro\\.stopped/",
           "group": "2_lifecycle@1"
         },
         {
           "command": "wslManager.terminate",
-          "when": "view == wslManager.distros && viewItem == wslDistro.running",
+          "when": "view == wslManager.distros && viewItem =~ /^wslDistro\\.running/",
           "group": "2_lifecycle@1"
         },
         {
           "command": "wslManager.restart",
-          "when": "view == wslManager.distros && viewItem == wslDistro.running",
+          "when": "view == wslManager.distros && viewItem =~ /^wslDistro\\.running/",
           "group": "2_lifecycle@2"
         },
         {
           "command": "wslManager.setDefault",
-          "when": "view == wslManager.distros && viewItem =~ /^wslDistro/",
+          "when": "view == wslManager.distros && viewItem =~ /^wslDistro\\.(running|stopped)$/",
           "group": "3_config@1"
         },
         {
           "command": "wslManager.editWslConf",
-          "when": "view == wslManager.distros && viewItem =~ /^wslDistro/",
+          "when": "view == wslManager.distros && viewItem =~ /^wslDistro\\.(running|stopped)$/",
           "group": "3_config@2"
         },
         {
           "command": "wslManager.setVersion",
-          "when": "view == wslManager.distros && viewItem =~ /^wslDistro/",
+          "when": "view == wslManager.distros && viewItem =~ /^wslDistro\\.(running|stopped)$/",
           "group": "3_config@3"
         },
         {
           "command": "wslManager.export",
           "when": "view == wslManager.distros && viewItem =~ /^wslDistro/",
           "group": "4_backup@1"
+        },
+        {
+          "command": "wslManager.compact",
+          "when": "view == wslManager.distros && viewItem =~ /^wslDistro\\.(running|stopped)$/",
+          "group": "4_backup@2"
         },
         {
           "command": "wslManager.copyName",
@@ -267,6 +278,11 @@
           "command": "wslManager.unregister",
           "when": "view == wslManager.distros && viewItem =~ /^wslDistro/",
           "group": "9_danger@1"
+        },
+        {
+          "command": "wslManager.compact",
+          "when": "view == wslManager.distros && viewItem == wslVhdx",
+          "group": "inline"
         }
       ]
     },
@@ -312,6 +328,11 @@
           "default": "expand",
           "description": "What clicking a distro in the list does."
         },
+        "wslManager.showManagedDistros": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show distros created by Docker Desktop, Podman, and Rancher Desktop (`docker-desktop`, `podman-*`, ...). They are labeled and protected by extra warnings either way."
+        },
         "wslManager.confirmDestructiveActions": {
           "type": "boolean",
           "default": true,
@@ -326,7 +347,9 @@
     "watch": "tsc -watch -p ./",
     "package": "vsce package",
     "publish": "vsce publish",
-    "test": "npm run compile && node --require ./out/test/setup.js --test \"out/test/**/*.test.js\""
+    "test": "npm run compile && node --require ./out/test/setup.js --test \"out/test/**/*.test.js\"",
+    "smoke": "npm run compile && node --require ./out/test/setup.js out/test/smoke.js",
+    "smoke:windows": "npm run compile && bash scripts/smoke-windows.sh"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

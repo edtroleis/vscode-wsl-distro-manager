@@ -6,6 +6,7 @@ import {
 	isCurrentWindowDistro,
 	isInsideDistro,
 	linuxToWindowsPath,
+	managedBy,
 	parseDistroList,
 	parseRegistry,
 	parseRuntimeInfo,
@@ -173,15 +174,21 @@ describe('parseRegistry', () => {
 });
 
 describe('parseRuntimeInfo', () => {
-	it('maps each line to its field', () => {
-		const info = parseRuntimeInfo('Fedora Linux 43 (WSL)\n6.18.33.2-microsoft-standard-WSL2\nuser\n66G\n1007G\n');
+	it('maps each line to its field and converts disk KB to bytes', () => {
+		const info = parseRuntimeInfo('Fedora Linux 43 (WSL)\n6.18.33.2-microsoft-standard-WSL2\nuser\n68517252\n1055762868\n');
 		assert.deepEqual(info, {
 			prettyName: 'Fedora Linux 43 (WSL)',
 			kernel: '6.18.33.2-microsoft-standard-WSL2',
 			user: 'user',
-			diskUsed: '66G',
-			diskSize: '1007G',
+			diskUsed: 68517252 * 1024,
+			diskSize: 1055762868 * 1024,
 		});
+	});
+
+	it('ignores non-numeric disk values', () => {
+		const info = parseRuntimeInfo('X\n6.6\nroot\ndf: not found\n\n');
+		assert.equal(info.diskUsed, undefined);
+		assert.equal(info.diskSize, undefined);
 	});
 
 	it('leaves missing or blank values undefined', () => {
@@ -288,5 +295,25 @@ describe('currentWindowDistro', () => {
 		workspace.workspaceFolders = [{ uri: Uri.from({ scheme: 'vscode-remote', authority: 'wsl+ubuntu-24.04', path: '/' }) }];
 		assert.equal(isCurrentWindowDistro('Ubuntu-24.04'), true);
 		assert.equal(isCurrentWindowDistro('Debian'), false);
+	});
+});
+
+describe('managedBy', () => {
+	it('recognizes distros created by container tools', () => {
+		assert.equal(managedBy('docker-desktop')?.tool, 'Docker Desktop');
+		assert.equal(managedBy('docker-desktop-data')?.tool, 'Docker Desktop');
+		assert.equal(managedBy('podman-machine-default')?.tool, 'Podman');
+		assert.equal(managedBy('podman-net-usermode')?.tool, 'Podman');
+		assert.equal(managedBy('rancher-desktop')?.tool, 'Rancher Desktop');
+	});
+
+	it('leaves regular distros alone, including look-alike names', () => {
+		for (const name of ['Ubuntu-24.04', 'fedora-linux-43', 'my-docker-desktop', 'docker-desktop-2', 'podman']) {
+			assert.equal(managedBy(name), undefined, name);
+		}
+	});
+
+	it('explains how to manage the distro instead', () => {
+		assert.match(managedBy('podman-machine-default')?.hint ?? '', /podman machine/);
 	});
 });

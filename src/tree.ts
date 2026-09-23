@@ -2,7 +2,10 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { DistroMonitor, formatBytes } from './monitor';
-import { Distro, isCurrentWindowDistro, list, registryInfo, runtimeInfo, toHostPath } from './wsl';
+import { Distro, isCurrentWindowDistro, list, managedBy, registryInfo, runtimeInfo, toHostPath } from './wsl';
+
+/** Below this, the gap between VHDX size and used space is not worth a compaction. */
+const RECLAIMABLE_THRESHOLD = 1024 ** 3;
 
 export class DistroItem extends vscode.TreeItem {
 	constructor(readonly distro: Distro) {
@@ -10,9 +13,14 @@ export class DistroItem extends vscode.TreeItem {
 		// A stable id keeps the expanded state across automatic refreshes.
 		this.id = `distro/${distro.name}`;
 
-		this.contextValue = distro.running ? 'wslDistro.running' : 'wslDistro.stopped';
+		// "wslDistro.<state>[.managed]": menus hide config actions on managed distros.
+		const managed = managedBy(distro.name);
+		this.contextValue = `wslDistro.${distro.running ? 'running' : 'stopped'}${managed ? '.managed' : ''}`;
 
 		const badges = [`WSL ${distro.version}`, distro.running ? 'Running' : 'Stopped'];
+		if (managed) {
+			badges.unshift(managed.tool);
+		}
 		if (distro.isDefault) {
 			badges.unshift('default');
 		}
@@ -21,15 +29,19 @@ export class DistroItem extends vscode.TreeItem {
 		}
 		this.description = badges.join(' · ');
 
+		const icon = managed ? 'package' : distro.running ? 'vm-active' : 'vm-outline';
 		this.iconPath = distro.running
-			? new vscode.ThemeIcon('vm-active', new vscode.ThemeColor('charts.green'))
-			: new vscode.ThemeIcon('vm-outline');
+			? new vscode.ThemeIcon(icon, new vscode.ThemeColor('charts.green'))
+			: new vscode.ThemeIcon(icon);
 
 		const tooltip = new vscode.MarkdownString();
 		tooltip.appendMarkdown(`**${distro.name}**\n\n`);
 		tooltip.appendMarkdown(`- State: ${distro.running ? 'Running' : 'Stopped'}\n`);
 		tooltip.appendMarkdown(`- Version: WSL ${distro.version}\n`);
 		tooltip.appendMarkdown(`- Default: ${distro.isDefault ? 'yes' : 'no'}\n`);
+		if (managed) {
+			tooltip.appendMarkdown(`\nManaged by **${managed.tool}**. ${managed.hint}\n`);
+		}
 		this.tooltip = tooltip;
 
 		const clickAction = vscode.workspace
@@ -52,8 +64,14 @@ export class DistroItem extends vscode.TreeItem {
 }
 
 /** A "label: value" row inside an expanded distro. */
-class InfoItem extends vscode.TreeItem {
-	constructor(parent: DistroItem, label: string, value: string, icon: string, tooltip?: string) {
+export class InfoItem extends vscode.TreeItem {
+	constructor(
+		readonly parent: DistroItem,
+		label: string,
+		value: string,
+		icon: string,
+		tooltip?: string,
+	) {
 		super(label, vscode.TreeItemCollapsibleState.None);
 		this.id = `${parent.id}/info/${label}`;
 		this.description = value;
@@ -72,6 +90,24 @@ class ConfigFileItem extends vscode.TreeItem {
 		this.contextValue = 'wslConfigFile';
 		this.command = { command, title: `Edit ${label}`, arguments: [parent] };
 	}
+}
+
+/**
+ * The VHDX only grows: space freed inside the distro stays allocated in the
+ * file. Comparing its size with what the distro actually uses (known only while
+ * it runs) shows how much a compaction would give back.
+ */
+export function vhdxItem(parent: DistroItem, vhdWindows: string, size: number, used: number | undefined): InfoItem {
+	const reclaimable = used !== undefined ? size - used : 0;
+	const worthIt = reclaimable >= RECLAIMABLE_THRESHOLD;
+	const value = worthIt ? `${formatBytes(size)} · ~${formatBytes(reclaimable)} reclaimable` : formatBytes(size);
+	const tooltip =
+		`${vhdWindows}\n\nFile size: ${formatBytes(size)}` +
+		(used !== undefined ? `\nUsed inside the distro: ${formatBytes(used)}` : '\nStart the distro to estimate reclaimable space.');
+	const item = new InfoItem(parent, 'VHDX', value, worthIt ? 'warning' : 'file-binary', tooltip);
+	// Managed distros get no inline Compact button: their tool owns the disk.
+	item.contextValue = parent.distro.version === 2 && !managedBy(parent.distro.name) ? 'wslVhdx' : 'wslInfo';
+	return item;
 }
 
 class MessageItem extends vscode.TreeItem {
@@ -125,7 +161,10 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 			const distros = await list();
 			this.loaded.fire(distros);
 			this.stopMonitorsExcept(new Set(distros.filter((d) => d.running).map((d) => d.name)));
-			return distros.map((d) => new DistroItem(d));
+			const showManaged = vscode.workspace
+				.getConfiguration('wslManager')
+				.get<boolean>('showManagedDistros', true);
+			return distros.filter((d) => showManaged || !managedBy(d.name)).map((d) => new DistroItem(d));
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			return [new MessageItem(`Failed to query wsl.exe: ${message}`, 'error')];
@@ -213,9 +252,14 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 			const uid = registry.defaultUid === 0 ? 'root (uid 0)' : `uid ${registry.defaultUid}`;
 			children.push(new InfoItem(item, 'Default user', uid, 'account'));
 		}
-		if (runtime?.diskUsed && runtime.diskSize) {
+		if (runtime?.diskUsed !== undefined && runtime.diskSize !== undefined) {
 			children.push(
-				new InfoItem(item, 'Disk (/)', `${runtime.diskUsed} used of ${runtime.diskSize}`, 'database'),
+				new InfoItem(
+					item,
+					'Disk (/)',
+					`${formatBytes(runtime.diskUsed)} used of ${formatBytes(runtime.diskSize)}`,
+					'database',
+				),
 			);
 		}
 		if (registry?.basePath) {
@@ -224,10 +268,10 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 				const vhdWindows = path.win32.join(registry.basePath, registry.vhdFileName);
 				const size = await toHostPath(vhdWindows)
 					.then((p) => fs.stat(p))
-					.then((st) => formatBytes(st.size))
+					.then((st) => st.size)
 					.catch(() => undefined);
-				if (size) {
-					children.push(new InfoItem(item, 'VHDX', size, 'file-binary', vhdWindows));
+				if (size !== undefined) {
+					children.push(vhdxItem(item, vhdWindows, size, runtime?.diskUsed));
 				}
 			}
 		}
@@ -278,7 +322,10 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 						}
 					}
 				}
-				if (e.affectsConfiguration('wslManager.clickAction')) {
+				if (
+					e.affectsConfiguration('wslManager.clickAction') ||
+					e.affectsConfiguration('wslManager.showManagedDistros')
+				) {
 					this.refresh();
 				}
 			}),
