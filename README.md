@@ -54,8 +54,11 @@ compacting, it starts them again (except Docker/Podman/Rancher distros, which
 must be started from their tool).
 
 The shutdown disconnects **every** VS Code window and terminal connected to WSL.
-Run compaction from a local VS Code window and wait for the result before
-reconnecting: `diskpart` reports no progress, and a 50 GB disk takes a few minutes
+Those windows retry while WSL is down and then give up; once compaction is done,
+reload them (`Developer: Reload Window`). When compaction runs from a window
+connected to WSL, the result notification offers **Reload Window** for it. Run
+compaction from a local VS Code window when you can, and wait for the result
+before reconnecting: `diskpart` reports no progress, and a 50 GB disk takes a few minutes
 (the notification shows the elapsed time).
 
 ### Distros managed by other tools

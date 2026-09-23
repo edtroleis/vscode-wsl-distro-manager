@@ -557,12 +557,25 @@ export function registerCommands(
 			}
 			const sizeAfter = (await fs.stat(vhdHost)).size;
 			const saved = sizeBefore - sizeAfter;
-			const reconnect = shutDown ? ' VS Code windows connected to WSL can reconnect now.' : '';
-			vscode.window.showInformationMessage(
-				(saved > 0
+			const summary =
+				saved > 0
 					? `"${distro.name}" compacted: ${formatBytes(sizeBefore)} → ${formatBytes(sizeAfter)} (${formatBytes(saved)} reclaimed).`
-					: `"${distro.name}" was already compact (${formatBytes(sizeAfter)}).`) + reconnect,
-			);
+					: `"${distro.name}" was already compact (${formatBytes(sizeAfter)}).`;
+			if (!shutDown) {
+				vscode.window.showInformationMessage(summary);
+				return;
+			}
+			// Windows connected to WSL retried while WSL was down for diskpart and
+			// gave up; only a reload reconnects them. We can reload this one.
+			const reconnect =
+				' VS Code windows connected to WSL that did not reconnect need "Developer: Reload Window".';
+			if (vscode.env.remoteName === 'wsl') {
+				vscode.window
+					.showInformationMessage(summary + reconnect, 'Reload Window')
+					.then((choice) => choice && vscode.commands.executeCommand('workbench.action.reloadWindow'));
+			} else {
+				vscode.window.showInformationMessage(summary + reconnect);
+			}
 		} finally {
 			if (toRestart.length > 0) {
 				await withProgress(`Starting ${toRestart.join(', ')} again...`, restart);
