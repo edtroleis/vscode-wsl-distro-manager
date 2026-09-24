@@ -1,20 +1,66 @@
 name: CI
 
+# Feature branches and pull requests. The release workflow reuses this one
+# (workflow_call), so main is tested by the same steps before publishing.
 on:
   push:
-    branches: [main]
+    branches-ignore: [main]
   pull_request:
+    branches: [main]
+  workflow_call:
+
+# A new push to a branch cancels its previous run; on main (called by the
+# release workflow) runs are never cancelled, or a version could be skipped.
+# Read-only token: CI only reads the code. Actions are pinned to commit hashes,
+# since a tag can be moved to other code.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: Test (${{ matrix.os }})
+    # Parsing and paths differ between the Windows host and WSL, so test both.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm test
       - name: Localization bundle is up to date
+        if: runner.os == 'Linux'
         run: npm run l10n && git diff --exit-code l10n/bundle.l10n.json
+      - name: Package
+        if: runner.os == 'Linux'
+        run: npx vsce package --out vscode-wsl-distro-manager.vsix
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: runner.os == 'Linux'
+        with:
+          name: vsix
+          path: vscode-wsl-distro-manager.vsix
+
+  version:
+    name: Version not yet published
+    # Every merge to main is published, and the Marketplace rejects a version
+    # it already has: a pull request must raise the version.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - id: status
+        run: bash scripts/marketplace-status.sh
+      - name: Require a new version
+        if: steps.status.outputs.published == 'true'
+        run: |
+          echo "::error file=package.json::Version ${{ steps.status.outputs.version }} is already on the Marketplace. Raise \"version\" in package.json (npm version patch|minor|major --no-git-tag-version) and add a CHANGELOG entry."
+          exit 1

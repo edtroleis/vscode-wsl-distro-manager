@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/edtroleis/vscode-wsl-distro-manager/security/advisories/new
+    about: Report it privately, not as an issue.
+  - name: WSL itself
+    url: https://github.com/microsoft/WSL/issues
+    about: Problems in wsl.exe or WSL that also happen without this extension.

@@ -1,13 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <!-- Source of icon.png: the mascot (resources/mascot.svg) on the brand blue. -->
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1a72d6"/>
-      <stop offset="1" stop-color="#0a3470"/>
-    </linearGradient>
-  </defs>
-  <rect x="4" y="4" width="120" height="120" rx="26" fill="url(#bg)"/>
-  <g transform="translate(14 6) scale(0.39)">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- The mascot: a penguin in a suit with a clipboard, keeping the distros in order.
+       Source of images/mascot.png. The same drawing is in icon.svg. -->
+  <g>
     <!-- feet -->
     <ellipse cx="100" cy="232" rx="24" ry="9" fill="#f5a623"/>
     <ellipse cx="156" cy="232" rx="24" ry="9" fill="#f5a623"/>

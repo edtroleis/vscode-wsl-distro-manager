@@ -1,38 +1,12 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { readFileAsRoot, windowsHomeDir, writeFileAsRoot } from './wsl';
+import { windowsHomeDir } from './wsl';
 
 export const SCHEME = 'wsl-config';
 
-const WSL_CONF_TEMPLATE = `# /etc/wsl.conf - settings for this distribution.
-# Applied on the next boot of the distro (use "Restart" in the WSL Distro Manager view).
-# Docs: https://learn.microsoft.com/windows/wsl/wsl-config
-
-[boot]
-systemd=true
-# command =
-
-[automount]
-enabled=true
-options="metadata,umask=22,fmask=11"
-# mountFsTab=true
-
-[network]
-generateHosts=true
-generateResolvConf=true
-# hostname =
-
-[interop]
-enabled=true
-appendWindowsPath=true
-
-# [user]
-# default=your-user
-`;
-
 const WSLCONFIG_TEMPLATE = `# .wslconfig - global settings for the WSL 2 VM (applies to every distro).
-# Applied after "wsl --shutdown".
+# Applied when WSL restarts (every distro stops); Windows does not need to restart.
 # Docs: https://learn.microsoft.com/windows/wsl/wsl-config
 
 [wsl2]
@@ -50,44 +24,20 @@ const WSLCONFIG_TEMPLATE = `# .wslconfig - global settings for the WSL 2 VM (app
 # sparseVhd=true
 `;
 
-type Target = { kind: 'global' } | { kind: 'distro'; distro: string; file: string };
-
 /** Resolved on demand because it depends on which host runs the extension. */
 async function globalConfigPath(): Promise<string> {
 	return path.join(await windowsHomeDir(), '.wslconfig');
 }
 
+/** The only file this provider serves: the global .wslconfig on Windows. */
 export function globalUri(): vscode.Uri {
 	return vscode.Uri.from({ scheme: SCHEME, path: '/global/.wslconfig' });
 }
 
-export function distroUri(distro: string): vscode.Uri {
-	return vscode.Uri.from({ scheme: SCHEME, path: `/distro/${distro}/etc/wsl.conf` });
-}
-
-/**
- * The distro name goes in the path (not the authority) because VS Code lowercases
- * the authority, and names like "FedoraLinux-43" need their exact case.
- */
-function parse(uri: vscode.Uri): Target {
-	const segments = uri.path.split('/').filter(Boolean);
-	if (segments[0] === 'global') {
-		return { kind: 'global' };
+function assertGlobal(uri: vscode.Uri): void {
+	if (uri.path !== globalUri().path) {
+		throw vscode.FileSystemError.FileNotFound(uri);
 	}
-	if (segments[0] === 'distro' && segments.length >= 2) {
-		return { kind: 'distro', distro: segments[1], file: '/' + segments.slice(2).join('/') };
-	}
-	throw vscode.FileSystemError.FileNotFound(uri);
-}
-
-export function describe(uri: vscode.Uri): string {
-	const target = parse(uri);
-	return target.kind === 'global' ? '.wslconfig' : `${target.distro}: ${target.file}`;
-}
-
-export function targetDistro(uri: vscode.Uri): string | undefined {
-	const target = parse(uri);
-	return target.kind === 'distro' ? target.distro : undefined;
 }
 
 export class WslConfigFileSystem implements vscode.FileSystemProvider {
@@ -116,19 +66,10 @@ export class WslConfigFileSystem implements vscode.FileSystemProvider {
 	}
 
 	async readFile(uri: vscode.Uri): Promise<Uint8Array> {
-		const target = parse(uri);
-		let content: string | undefined;
-
-		if (target.kind === 'global') {
-			content = await fs.readFile(await globalConfigPath(), 'utf8').catch(() => undefined);
-		} else {
-			content = await readFileAsRoot(target.distro, target.file);
-		}
-
+		assertGlobal(uri);
 		// A missing file opens with a commented template; saving is what creates it.
-		if (content === undefined) {
-			content = target.kind === 'global' ? WSLCONFIG_TEMPLATE : WSL_CONF_TEMPLATE;
-		}
+		const content =
+			(await fs.readFile(await globalConfigPath(), 'utf8').catch(() => undefined)) ?? WSLCONFIG_TEMPLATE;
 
 		const key = uri.toString();
 		const cached = this.versions.get(key);
@@ -139,16 +80,9 @@ export class WslConfigFileSystem implements vscode.FileSystemProvider {
 	}
 
 	async writeFile(uri: vscode.Uri, content: Uint8Array): Promise<void> {
-		const target = parse(uri);
+		assertGlobal(uri);
 		const buffer = Buffer.from(content);
-
-		if (target.kind === 'global') {
-			await fs.writeFile(await globalConfigPath(), buffer);
-		} else {
-			// wsl.conf needs LF; the editor may have saved CRLF on a Windows host.
-			const normalized = Buffer.from(buffer.toString('utf8').replace(/\r\n/g, '\n'), 'utf8');
-			await writeFileAsRoot(target.distro, target.file, normalized);
-		}
+		await fs.writeFile(await globalConfigPath(), buffer);
 
 		this.versions.set(uri.toString(), { content: buffer.toString('utf8'), mtime: Date.now() });
 		this.emitter.fire([{ type: vscode.FileChangeType.Changed, uri }]);

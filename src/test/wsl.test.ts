@@ -3,7 +3,14 @@ import { afterEach, describe, it } from 'node:test';
 import {
 	currentWindowDistro,
 	decode,
+	diskpartScript,
+	system32,
+	wslExePath,
+	encodePowerShell,
 	interopBroken,
+	interopMissingFromListing,
+	isAscii,
+	list,
 	isCurrentWindowDistro,
 	isInsideDistro,
 	linuxToWindowsPath,
@@ -429,5 +436,64 @@ describe('run cancellation', { skip: process.platform === 'win32' }, () => {
 		const controller = new AbortController();
 		controller.abort();
 		await assert.rejects(run(['10'], { signal: controller.signal }), CancelledError);
+	});
+});
+
+describe('isAscii', () => {
+	it('accepts plain Windows paths and rejects accented ones (which diskpart cannot read)', () => {
+		assert.equal(isAscii('E:\\wsl\\fedora-linux-43\\ext4.vhdx'), true);
+		assert.equal(isAscii('C:\\Users\\joão\\AppData\\Local\\wsl\\ext4.vhdx'), false);
+		assert.equal(isAscii('C:\\Users\\edtro\\OneDrive\\READET~1'), true);
+	});
+});
+
+describe('list with no distro installed', { skip: process.platform === 'win32' }, () => {
+	afterEach(() => {
+		delete settings['wslExePath'];
+	});
+
+	it('returns an empty list instead of failing, so the welcome view shows', async () => {
+		// wsl.exe with no distros: a localized message and a non-zero exit code.
+		const fake = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wsl-')), 'wsl');
+		fs.writeFileSync(fake, '#!/bin/sh\necho "O Subsistema do Windows para Linux nao tem distribuicoes instaladas."\nexit 1\n', { mode: 0o755 });
+		settings['wslExePath'] = fake;
+		assert.deepEqual(await list(), []);
+	});
+});
+
+describe('interopMissingFromListing', () => {
+	it('is false while WSLInterop (or WSLInterop-late) is registered', () => {
+		assert.equal(interopMissingFromListing('WSLInterop\nqemu-aarch64\nregister\nstatus\n'), false);
+		assert.equal(interopMissingFromListing('WSLInterop-late register status'), false);
+	});
+
+	it('is true when binfmt_misc is mounted but the entry is gone', () => {
+		assert.equal(interopMissingFromListing('qemu-aarch64\nregister\nstatus\n'), true);
+	});
+
+	it('does not guess when binfmt_misc is not mounted', () => {
+		assert.equal(interopMissingFromListing(''), false);
+	});
+});
+
+describe('diskpart script', () => {
+	it('pipes the commands to diskpart and writes its output to the log, with no temp script file', () => {
+		const script = diskpartScript('E:\\wsl\\Ubuntu\\ext4.vhdx', "C:\\Temp\\it's.log");
+		assert.match(script, /'select vdisk file="E:\\wsl\\Ubuntu\\ext4\.vhdx"', 'attach vdisk readonly', 'compact vdisk', 'detach vdisk', 'exit'/);
+		// diskpart by absolute path: a same-named program elsewhere in the PATH must not run elevated.
+		assert.match(script, /\| & "\$env:SystemRoot\\System32\\diskpart\.exe" 2>&1 \| Out-File -FilePath 'C:\\Temp\\it''s\.log'/);
+		assert.match(script, /exit \$LASTEXITCODE$/);
+	});
+
+	it('encodes for -EncodedCommand as base64 of UTF-16LE', () => {
+		assert.equal(Buffer.from(encodePowerShell('exit 0'), 'base64').toString('utf16le'), 'exit 0');
+	});
+});
+
+describe('system32', { skip: process.platform === 'win32' }, () => {
+	it('names Windows programs by absolute path, never by bare name', () => {
+		assert.equal(system32('reg.exe'), '/mnt/c/Windows/System32/reg.exe');
+		assert.equal(system32('WindowsPowerShell\\v1.0\\powershell.exe'), '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe');
+		assert.equal(wslExePath(), '/mnt/c/Windows/System32/wsl.exe');
 	});
 });

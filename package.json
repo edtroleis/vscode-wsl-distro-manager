@@ -1,8 +1,8 @@
 {
-  "name": "wsl-distro-manager",
-  "displayName": "WSL Distro Manager",
+  "name": "vscode-wsl-distro-manager",
+  "displayName": "Distro Manager for WSL",
   "description": "%description%",
-  "version": "1.0.0",
+  "version": "0.0.6",
   "publisher": "edtroleis",
   "license": "MIT",
   "icon": "resources/icon.png",
@@ -35,8 +35,7 @@
     "compact",
     "backup",
     "monitor",
-    "wslconfig",
-    "wsl.conf"
+    "wslconfig"
   ],
   "extensionKind": [
     "ui",
@@ -45,12 +44,19 @@
   "main": "./out/extension.js",
   "l10n": "./l10n",
   "activationEvents": [],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true,
+      "description": "%capabilities.untrustedWorkspaces%"
+    },
+    "virtualWorkspaces": true
+  },
   "contributes": {
     "viewsContainers": {
       "activitybar": [
         {
           "id": "wslManager",
-          "title": "WSL Distro Manager",
+          "title": "Distro Manager for WSL",
           "icon": "resources/wsl.svg"
         }
       ]
@@ -59,7 +65,7 @@
       "wslManager": [
         {
           "id": "wslManager.distros",
-          "name": "WSL Distro Manager",
+          "name": "Distro Manager for WSL",
           "icon": "resources/wsl.svg"
         }
       ]
@@ -83,125 +89,132 @@
       {
         "command": "wslManager.refresh",
         "title": "%command.refresh%",
-        "category": "WSL Distro Manager",
+        "category": "Distro Manager for WSL",
         "icon": "$(refresh)"
       },
       {
         "command": "wslManager.shutdown",
         "title": "%command.shutdown%",
-        "category": "WSL Distro Manager",
+        "category": "Distro Manager for WSL",
         "icon": "$(debug-stop)"
+      },
+      {
+        "command": "wslManager.restartWsl",
+        "title": "%command.restartWsl%",
+        "category": "Distro Manager for WSL",
+        "icon": "$(debug-restart)"
       },
       {
         "command": "wslManager.repairInterop",
         "title": "%command.repairInterop%",
-        "category": "WSL Distro Manager"
+        "category": "Distro Manager for WSL"
       },
       {
         "command": "wslManager.editWslConfig",
         "title": "%command.editWslConfig%",
-        "category": "WSL Distro Manager",
+        "category": "Distro Manager for WSL",
+        "icon": "$(file-code)"
+      },
+      {
+        "command": "wslManager.openSettings",
+        "title": "%command.openSettings%",
+        "category": "Distro Manager for WSL",
         "icon": "$(settings-gear)"
       },
       {
         "command": "wslManager.install",
         "title": "%command.install%",
-        "category": "WSL Distro Manager",
+        "category": "Distro Manager for WSL",
         "icon": "$(add)"
       },
       {
         "command": "wslManager.import",
         "title": "%command.import%",
-        "category": "WSL Distro Manager",
+        "category": "Distro Manager for WSL",
         "icon": "$(cloud-download)"
       },
       {
         "command": "wslManager.openWindow",
         "title": "%command.openWindow%",
-        "category": "WSL Distro Manager",
+        "category": "Distro Manager for WSL",
         "icon": "$(empty-window)"
       },
       {
         "command": "wslManager.openTerminal",
         "title": "%command.openTerminal%",
-        "category": "WSL Distro Manager",
+        "category": "Distro Manager for WSL",
         "icon": "$(terminal)"
       },
       {
         "command": "wslManager.start",
         "title": "%command.start%",
-        "category": "WSL Distro Manager",
+        "category": "Distro Manager for WSL",
         "icon": "$(play)"
       },
       {
         "command": "wslManager.terminate",
         "title": "%command.terminate%",
-        "category": "WSL Distro Manager",
+        "category": "Distro Manager for WSL",
         "icon": "$(stop-circle)"
       },
       {
         "command": "wslManager.restart",
         "title": "%command.restart%",
-        "category": "WSL Distro Manager",
+        "category": "Distro Manager for WSL",
         "icon": "$(debug-restart)"
       },
       {
         "command": "wslManager.setDefault",
         "title": "%command.setDefault%",
-        "category": "WSL Distro Manager",
+        "category": "Distro Manager for WSL",
         "icon": "$(star-full)"
-      },
-      {
-        "command": "wslManager.editWslConf",
-        "title": "%command.editWslConf%",
-        "category": "WSL Distro Manager",
-        "icon": "$(settings)"
       },
       {
         "command": "wslManager.export",
         "title": "%command.export%",
-        "category": "WSL Distro Manager",
+        "category": "Distro Manager for WSL",
         "icon": "$(cloud-upload)"
       },
       {
         "command": "wslManager.compact",
         "title": "%command.compact%",
-        "category": "WSL Distro Manager",
+        "category": "Distro Manager for WSL",
         "icon": "$(fold)"
       },
       {
         "command": "wslManager.move",
         "title": "%command.move%",
-        "category": "WSL Distro Manager",
+        "category": "Distro Manager for WSL",
         "icon": "$(folder-opened)"
       },
       {
         "command": "wslManager.backup",
         "title": "%command.backup%",
-        "category": "WSL Distro Manager",
+        "category": "Distro Manager for WSL",
         "icon": "$(archive)"
       },
       {
         "command": "wslManager.sendFiles",
         "title": "%command.sendFiles%",
-        "category": "WSL Distro Manager",
+        "category": "Distro Manager for WSL",
         "icon": "$(cloud-upload)"
-      },
-      {
-        "command": "wslManager.setVersion",
-        "title": "%command.setVersion%",
-        "category": "WSL Distro Manager"
       },
       {
         "command": "wslManager.unregister",
         "title": "%command.unregister%",
-        "category": "WSL Distro Manager",
+        "category": "Distro Manager for WSL",
         "icon": "$(trash)"
       },
       {
         "command": "wslManager.copyName",
         "title": "%command.copyName%",
-        "category": "WSL Distro Manager"
+        "category": "Distro Manager for WSL"
+      },
+      {
+        "command": "wslManager.about",
+        "title": "%command.about%",
+        "category": "Distro Manager for WSL",
+        "icon": "$(info)"
       }
     ],
     "menus": {
@@ -217,7 +230,7 @@
           "group": "navigation@1"
         },
         {
-          "command": "wslManager.editWslConfig",
+          "command": "wslManager.openSettings",
           "when": "view == wslManager.distros",
           "group": "navigation@2"
         },
@@ -235,6 +248,11 @@
           "command": "wslManager.repairInterop",
           "when": "view == wslManager.distros",
           "group": "2_interop@1"
+        },
+        {
+          "command": "wslManager.about",
+          "when": "view == wslManager.distros",
+          "group": "9_about@1"
         }
       ],
       "view/item/context": [
@@ -289,16 +307,6 @@
           "group": "3_config@1"
         },
         {
-          "command": "wslManager.editWslConf",
-          "when": "view == wslManager.distros && viewItem =~ /^wslDistro\\.(running|stopped)$/",
-          "group": "3_config@2"
-        },
-        {
-          "command": "wslManager.setVersion",
-          "when": "view == wslManager.distros && viewItem =~ /^wslDistro\\.(running|stopped)$/",
-          "group": "3_config@3"
-        },
-        {
           "command": "wslManager.export",
           "when": "view == wslManager.distros && viewItem =~ /^wslDistro/",
           "group": "4_backup@1"
@@ -337,13 +345,34 @@
           "command": "wslManager.sendFiles",
           "when": "view == wslManager.distros && viewItem =~ /^wslDistro\\.(running|stopped)$/",
           "group": "5_files@2"
+        },
+        {
+          "command": "wslManager.restartWsl",
+          "when": "view == wslManager.distros && viewItem == wslGlobalConfig.pending",
+          "group": "inline"
+        },
+        {
+          "command": "wslManager.restartWsl",
+          "when": "view == wslManager.distros && viewItem =~ /^wslGlobal/",
+          "group": "1_wsl@1"
+        },
+        {
+          "command": "wslManager.shutdown",
+          "when": "view == wslManager.distros && viewItem =~ /^wslGlobal/",
+          "group": "1_wsl@2"
+        },
+        {
+          "command": "wslManager.editWslConfig",
+          "when": "view == wslManager.distros && viewItem =~ /^wslGlobal/",
+          "group": "0_edit@1"
         }
       ]
     },
     "configuration": {
-      "title": "WSL Distro Manager",
+      "title": "Distro Manager for WSL",
       "properties": {
         "wslManager.wslExePath": {
+          "scope": "machine",
           "type": "string",
           "default": "",
           "markdownDescription": "%config.wslExePath%"
@@ -361,6 +390,7 @@
           "markdownDescription": "%config.metricsIntervalSeconds%"
         },
         "wslManager.backupFolder": {
+          "scope": "machine",
           "type": "string",
           "default": "",
           "markdownDescription": "%config.backupFolder%"
@@ -381,6 +411,7 @@
           "markdownDescription": "%config.backupExcludes%"
         },
         "wslManager.defaultUser": {
+          "scope": "machine",
           "type": "string",
           "default": "",
           "description": "%config.defaultUser%"
@@ -408,6 +439,7 @@
           "markdownDescription": "%config.showManagedDistros%"
         },
         "wslManager.confirmDestructiveActions": {
+          "scope": "machine",
           "type": "boolean",
           "default": true,
           "description": "%config.confirmDestructiveActions%"

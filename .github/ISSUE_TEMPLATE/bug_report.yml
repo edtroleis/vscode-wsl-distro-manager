@@ -1,0 +1,57 @@
+name: Bug report
+description: Something does not work as described.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. For security issues, use a private
+        [security advisory](https://github.com/edtroleis/vscode-wsl-distro-manager/security/advisories/new) instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead. Screenshots help.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Right-click a running distro
+        2. Choose ...
+    validations:
+      required: true
+  - type: input
+    id: extension
+    attributes:
+      label: Extension version
+      description: Run **About** from the view's `...` menu.
+      placeholder: "x.y.z"
+    validations:
+      required: true
+  - type: textarea
+    id: versions
+    attributes:
+      label: WSL and Windows versions
+      description: Output of `wsl --version`.
+      render: text
+    validations:
+      required: true
+  - type: dropdown
+    id: window
+    attributes:
+      label: Where VS Code runs
+      options:
+        - Local window on Windows
+        - Window connected to WSL
+        - Both
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: "**View > Output**, then choose *Distro Manager for WSL*. It holds no passwords or file contents, but check it for folder names you prefer to hide."
+      render: text

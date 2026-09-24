@@ -222,7 +222,22 @@ export class DistroMonitor implements vscode.Disposable {
 			return;
 		}
 		let lastChange = Date.now();
+		// A takeover checks that the distro runs (a wsl.exe call), which can take
+		// longer than the interval; overlapping polls could then both take over
+		// and start two samplers.
+		let polling = false;
 		const poll = async () => {
+			if (polling) {
+				return;
+			}
+			polling = true;
+			try {
+				await pollOnce();
+			} finally {
+				polling = false;
+			}
+		};
+		const pollOnce = async () => {
 			const line = await fs.readFile(paths.sample, 'utf8').catch(() => undefined);
 			if (generation !== this.generation) {
 				return;
@@ -346,10 +361,16 @@ export class DistroMonitor implements vscode.Disposable {
 	}
 
 	private apply(sample: Sample): void {
+		// Everything is in the row itself: the row is redrawn on every sample, and a
+		// redraw closes its tooltip, so a tooltip would vanish within seconds.
 		const memUsedVm = sample.memTotal - sample.memAvail;
-		this.memory.description = `${bar(sample.rssBytes / sample.memTotal)} ${formatBytes(sample.rssBytes)}`;
-		this.memory.tooltip =
-			vscode.l10n.t('Distro: {0} (sum of process RSS; shared pages are counted more than once)\nWSL VM: {1} used of {2} ({3}%)', formatBytes(sample.rssBytes), formatBytes(memUsedVm), formatBytes(sample.memTotal), ((memUsedVm / sample.memTotal) * 100).toFixed(0));
+		this.memory.description = vscode.l10n.t(
+			'{0} {1} · VM {2} of {3}',
+			bar(sample.rssBytes / sample.memTotal),
+			formatBytes(sample.rssBytes),
+			formatBytes(memUsedVm),
+			formatBytes(sample.memTotal),
+		);
 		this.processes.description = String(sample.procs);
 
 		const prev = this.previous;
@@ -360,9 +381,13 @@ export class DistroMonitor implements vscode.Disposable {
 				// Processes that exited between samples drop out of the sum; never go negative.
 				const distro = Math.max(0, sample.procJiffies - prev.procJiffies) / total;
 				const vm = 1 - Math.max(0, sample.cpuIdle - prev.cpuIdle) / total;
-				this.cpu.description = `${bar(distro)} ${(distro * 100).toFixed(1)}%`;
-				this.cpu.tooltip =
-					vscode.l10n.t('Distro: {0}% of the VM ({1}% of one core)\nWSL VM: {2}% of {3} cores', (distro * 100).toFixed(1), (distro * sample.ncpu * 100).toFixed(0), (vm * 100).toFixed(1), sample.ncpu);
+				this.cpu.description = vscode.l10n.t(
+					'{0} {1}% · VM {2}% of {3} cores',
+					bar(distro),
+					(distro * 100).toFixed(1),
+					(vm * 100).toFixed(0),
+					sample.ncpu,
+				);
 			}
 		}
 		this.onUpdate(this.items);

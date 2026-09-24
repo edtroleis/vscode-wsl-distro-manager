@@ -80,3 +80,34 @@ export function promptText(options: TextPromptOptions): Promise<string | undefin
 		pick.show();
 	});
 }
+
+/**
+ * A masked password prompt, confirmed with Enter or the ✓ in its title bar.
+ * The value is returned to the caller only; nothing stores or logs it.
+ */
+export function promptPassword(title: string, prompt: string): Promise<string | undefined> {
+	return new Promise((resolve) => {
+		const box = vscode.window.createInputBox();
+		box.title = title;
+		box.prompt = prompt;
+		box.password = true;
+		box.ignoreFocusOut = true;
+		const confirm: vscode.QuickInputButton = { iconPath: new vscode.ThemeIcon('check'), tooltip: vscode.l10n.t('Confirm') };
+		box.buttons = [confirm];
+		let accepted = false;
+		const accept = () => {
+			accepted = true;
+			resolve(box.value);
+			box.hide();
+		};
+		box.onDidAccept(accept);
+		box.onDidTriggerButton((button) => button === confirm && accept());
+		box.onDidHide(() => {
+			if (!accepted) {
+				resolve(undefined);
+			}
+			box.dispose();
+		});
+		box.show();
+	});
+}

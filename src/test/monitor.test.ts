@@ -79,7 +79,8 @@ describe('DistroMonitor', () => {
 		const monitor = new DistroMonitor('Ubuntu', () => undefined);
 		feed(monitor, sample());
 
-		assert.equal(monitor.memory.description, `${bar(1 / 16)} 1.0 GB`);
+		// 16 GB total, 12 GB available: the VM uses 4 GB.
+		assert.equal(monitor.memory.description, `${bar(1 / 16)} 1.0 GB · VM 4.0 GB of 16.0 GB`);
 		assert.equal(monitor.processes.description, '60');
 		assert.equal(monitor.cpu.description, 'waiting...');
 	});
@@ -90,16 +91,14 @@ describe('DistroMonitor', () => {
 		feed(monitor, sample({ cpuTotal: 11_000, cpuIdle: 8_500, procJiffies: 550 }));
 
 		// 50 of 1000 jiffies for the distro; 500 of 1000 idle for the VM.
-		assert.equal(monitor.cpu.description, `${bar(0.05)} 5.0%`);
-		assert.match(String(monitor.cpu.tooltip), /40% of one core/);
-		assert.match(String(monitor.cpu.tooltip), /WSL VM: 50\.0% of 8 cores/);
+		assert.equal(monitor.cpu.description, `${bar(0.05)} 5.0% · VM 50% of 8 cores`);
 	});
 
 	it('never reports negative CPU when processes exit between samples', () => {
 		const monitor = new DistroMonitor('Ubuntu', () => undefined);
 		feed(monitor, sample());
 		feed(monitor, sample({ cpuTotal: 11_000, procJiffies: 100 }));
-		assert.match(String(monitor.cpu.description), / 0\.0%$/);
+		assert.match(String(monitor.cpu.description), / 0\.0% · VM /);
 	});
 
 	it('keeps the previous CPU value when no time has passed', () => {
@@ -124,5 +123,15 @@ describe('DistroMonitor', () => {
 			monitor.items.map((i) => i.id),
 			['distro/Ubuntu/metric/cpu', 'distro/Ubuntu/metric/memory', 'distro/Ubuntu/metric/procs'],
 		);
+	});
+});
+
+describe('metric rows', () => {
+	it('carry no tooltip: each sample redraws the row, which would close it within seconds', () => {
+		const monitor = new DistroMonitor('Ubuntu', () => undefined);
+		feed(monitor, sample());
+		feed(monitor, sample({ cpuTotal: 11_000, procJiffies: 550 }));
+		assert.equal(monitor.cpu.tooltip, undefined);
+		assert.equal(monitor.memory.tooltip, undefined);
 	});
 });

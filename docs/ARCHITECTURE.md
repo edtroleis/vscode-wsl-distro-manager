@@ -1,6 +1,6 @@
 # Architecture
 
-How WSL Distro Manager is organized, and the WSL behaviors it works around.
+How Distro Manager for WSL is organized, and the WSL behaviors it works around.
 Most of these were found by testing against a real installation (WSL 2.7.14,
 Windows 11); each section says what goes wrong without the workaround.
 
@@ -9,13 +9,16 @@ Windows 11); each section says what goes wrong without the workaround.
 | File | Responsibility |
 |---|---|
 | [`src/extension.ts`](../src/extension.ts) | Activation: registers the view, the commands, and the `wsl-config:` file system; offers to apply config changes on save. |
-| [`src/tree.ts`](../src/tree.ts) | The sidebar tree: distro rows, expandable details, the VHDX row, refresh timer, interop healing. |
-| [`src/commands.ts`](../src/commands.ts) | Lifecycle, export/import, install, move, compaction, and their confirmations. |
+| [`src/tree.ts`](../src/tree.ts) | The sidebar tree: the WSL node, distro rows, expandable details, the VHDX row, the refresh timer. |
+| [`src/commands.ts`](../src/commands.ts) | Lifecycle, Restart WSL, export/import, install, move, compaction, and their confirmations. |
+| [`src/interop.ts`](../src/interop.ts) | Detecting lost Windows interop and repairing it through `sudo`, with consent. |
+| [`src/pending.ts`](../src/pending.ts) | Tracking a saved `.wslconfig` until WSL restarts. |
 | [`src/transfer.ts`](../src/transfer.ts) | Folder backups and sending files into a distro. |
 | [`src/monitor.ts`](../src/monitor.ts) | Live CPU and memory, shared between VS Code windows. |
 | [`src/wsl.ts`](../src/wsl.ts) | Everything that runs `wsl.exe`, `reg.exe`, PowerShell, or `diskpart`, plus the parsers for their output. |
-| [`src/configFs.ts`](../src/configFs.ts) | File system provider that reads and writes `/etc/wsl.conf` as root and `.wslconfig` on Windows. |
+| [`src/configFs.ts`](../src/configFs.ts) | File system provider for the global `.wslconfig` on Windows, which opens a template when the file does not exist yet. |
 | [`src/progress.ts`](../src/progress.ts), [`src/prompts.ts`](../src/prompts.ts) | Progress notifications and text prompts with a Confirm button. |
+| [`src/log.ts`](../src/log.ts) | The *Distro Manager for WSL* log in the Output panel. |
 
 Parsing is kept in pure functions (`parseDistroList`, `parseRegistry`,
 `parseSample`, ...) so the unit tests can exercise them with real output and no
@@ -33,7 +36,7 @@ Paths and programs differ between the two hosts:
 
 | | Windows host | Inside WSL |
 |---|---|---|
-| `wsl.exe`, `reg.exe`, PowerShell | on the `PATH` | `/mnt/c/Windows/System32/...`, through interop |
+| `wsl.exe`, `reg.exe`, PowerShell | `%SystemRoot%\System32\...`, by absolute path | `/mnt/c/Windows/System32/...`, through interop |
 | Windows folders (`%USERPROFILE%`, `%TEMP%`) | `os.homedir()`, `os.tmpdir()` | `cmd.exe /c echo %VAR%` + `wslpath -u` |
 | Paths returned by file dialogs | Windows paths | Linux paths, converted with `wslpath -w` before `wsl.exe` sees them |
 
@@ -46,6 +49,10 @@ when the extension runs on Windows; `toWindowsPath()` converts those too.
 `WSL_UTF8=1` is ignored by several builds. Read as UTF-8, every character is
 followed by a NUL. `decode()` checks for a BOM and then for the interleaved NUL
 pattern.
+
+**No distro installed.** `wsl --list --quiet` then exits with an error and a
+localized message, which must not be read as distro names: a non-zero exit
+means an empty list, and the view shows its welcome actions.
 
 **Localized columns.** `wsl --list --verbose` translates the STATE column to
 the Windows display language, and translations may contain spaces
@@ -78,15 +85,19 @@ quoting can break it.
 **The tree redraws on state changes.** For an existing tree item id, VS Code
 updates the icon shape but not its color, so a started distro kept a gray icon.
 Item ids include the state, and the provider remembers which distros are
-expanded so they stay expanded across the change.
+expanded so they stay expanded across the change. Even so, a theme-colored
+icon sometimes stayed gray, so running distros use green SVG files
+(`resources/*-running-{light,dark}.svg`), whose color is part of the file.
 
 **Windows interop disappears.** Linux runs `.exe` files through the `WSLInterop`
 entry in `binfmt_misc`, which belongs to the kernel every distro shares. When a
-distro stops, the entry is removed for all of them. WSL already disables
-`systemd-binfmt --unregister`, and the entry still goes, so nothing inside a
-distro prevents it. The extension re-registers it in the running distros right
-after its own *Stop* and *Unregister*, whenever a refresh shows that a distro
-stopped, and on demand. When the extension itself runs inside WSL and a `.exe`
+distro stops, the entry is removed for all of them, a few seconds later. WSL
+already disables `systemd-binfmt --unregister`, and the entry still goes, so
+nothing inside a distro prevents it. After its own *Stop* and *Unregister*, and
+whenever a refresh shows that a distro stopped, the extension lists
+`binfmt_misc` as the default user for up to 15 seconds; if the entry is gone, it
+offers the repair (see *No root without consent*). Repairing it in one distro
+repairs all. When the extension itself runs inside WSL and a `.exe`
 fails, it checks for the missing entry and says so, instead of surfacing the
 shell's "cannot execute binary file".
 
@@ -100,16 +111,22 @@ waits for Windows to be able to open the file exclusively, and otherwise asks
 to shut WSL down, restarting the distros that were running afterwards (except
 Docker, Podman, and Rancher ones, which their tools must start).
 
-**Shutdowns never disconnect VS Code windows.** A shutdown kills every VS Code
-window connected to WSL, and those windows retried while WSL was down and then
-gave up. Before any of this starts, the extension looks for `wsl.exe`
-processes running the VS Code server; if there are any, it refuses and changes
-nothing.
+**Compaction and moving never disconnect VS Code windows.** A shutdown kills
+every VS Code window connected to WSL, and in testing those windows retried
+while WSL was down for `diskpart` and then gave up. Before compacting or moving,
+the extension looks for `wsl.exe` processes running the VS Code server; if
+there are any, it refuses and changes nothing. *Restart WSL* and *Shut Down
+WSL* exist to stop WSL, so they only warn, naming the connected distros.
 
 **Compaction** runs `diskpart` (`attach vdisk readonly`, `compact vdisk`)
-elevated through `Start-Process -Verb RunAs`. An elevated process cannot pipe
-its output back, so `cmd.exe` redirects it to a log file that is read
-afterwards.
+elevated through `Start-Process -Verb RunAs`. The commands travel inside the
+elevated PowerShell's command line (`-EncodedCommand`) and are piped into
+`diskpart`: a script file in `%TEMP%` could be changed by another program of
+the same user between the UAC prompt and the run, turning the consent into
+arbitrary `diskpart` commands. An elevated process cannot pipe its output
+back, so it writes `diskpart`'s output to a log file that is read afterwards. `diskpart` reads its script in the legacy code page, so a VHDX path
+with accents (for example under `C:\Users\joão`) is replaced by its 8.3 short
+form, which is plain ASCII; a drive without short names gets a clear error.
 
 **Reclaimable space** is the VHDX size minus the space used inside the distro
 (`df`). The VHDX always holds some file system overhead, so the estimate is
@@ -133,6 +150,10 @@ On WSL 2 all distros share one VM, but each has its own PID namespace. Summing
 loop per distro prints a sample per interval, so `wsl.exe` is not spawned on
 every tick.
 
+The rows show the distro's figures next to the VM totals, in the row itself
+rather than in a tooltip: each sample redraws the row, and VS Code closes a
+tooltip when its row is redrawn, so a tooltip would vanish within seconds.
+
 That loop is shared by every VS Code window. The first window to expand a
 distro takes a lock file in `%TEMP%\wsl-distro-manager` and writes each sample
 next to it; the others read that file. When the leader stops, it deletes the
@@ -142,17 +163,46 @@ times: the WSL VM clock drifted about 10 seconds from Windows, which made fresh
 locks look abandoned. Before taking over, a follower checks that the distro
 still runs, so it never boots a distro that just stopped.
 
-## Files inside distros
+## Pending .wslconfig changes
 
-**`/etc/wsl.conf` needs root.** The `\\wsl.localhost` share accesses a distro
-as its default user, so saving to `/etc` fails. A `FileSystemProvider` on the
-`wsl-config:` scheme reads and writes through `wsl -u root`, converting CRLF to
-LF on save. The distro name is in the URI path, not the authority, because VS
-Code lowercases the authority and names such as `FedoraLinux-43` and
-`fedora-linux-43` can coexist.
+`.wslconfig` applies when the WSL VM boots. After a save, the extension stores
+the time in `globalState` and flags the setting as pending. Each time the WSL
+node loads, a running distro reports `/proc/uptime`; if the VM booted after
+the save, the flag clears. Uptime is a duration, so the VM clock drift does
+not matter. With no distro running the extension cannot tell whether the VM is
+still up, so the flag stays.
+
+## Privileges
+
+**No root without consent.** WSL lets the Windows account enter any distro as
+root with `wsl -u root` and no password, bypassing the distro's `sudo` rules.
+The extension never uses it (editing `/etc/wsl.conf` and a silent interop
+repair both did, and were removed before the first release). The one privileged step left,
+re-registering `WSLInterop`, runs through the distro's `sudo` after the user
+agrees: `sudo -n` first, which succeeds only if the distro allows it without a
+password, then `sudo -S` with the password on standard input. A default user
+that is root writes directly, as it would in its own terminal.
+
+**Settings from the user only.** The extension runs in untrusted workspaces,
+so a workspace must not steer it. The settings that name a program, a user, a
+destination, or turn off confirmations have `"scope": "machine"`, which VS Code
+reads only from user (or remote machine) settings, never from a workspace's
+`.vscode/settings.json`. A test keeps that list in place.
+
+**Programs by absolute path.** Windows programs are started from `System32`
+by full path (`system32()`), and the elevated chain names PowerShell and
+`diskpart` through `$env:SystemRoot`. A bare name would let a same-named
+program earlier in the `PATH` run instead, with administrator rights in the
+elevated case. (The current Node runtime does not search the working folder
+first, which was checked; this is defense in depth.)
+
+## Files inside distros
 
 **Backups and sent files run as the default user.** Archivers run with
 `wsl --cd ~ --exec`, so no shell parses paths or patterns. Folder permissions
 are checked before copying; a folder that would need `sudo` is refused. File
 dialogs cannot browse `\\wsl.localhost` (VS Code blocks UNC hosts), so folders
 inside a distro are picked from a list of the home folder or typed.
+A backup is an unencrypted archive, so one that includes folders usually
+holding credentials (`.ssh`, `.aws`, `.kube`, ...) asks first, and says when the
+destination is synced to the cloud (a Desktop in OneDrive, for example).

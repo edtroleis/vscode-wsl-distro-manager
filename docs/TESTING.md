@@ -33,7 +33,7 @@ VSIX...** and pick the file, or install it from WSL:
 
 ```bash
 cd "/mnt/c/Program Files/Microsoft VS Code/bin" &&
-  cmd.exe /c code.cmd --install-extension 'C:\Users\<you>\Downloads\wsl-distro-manager-<version>.vsix' --force
+  cmd.exe /c code.cmd --install-extension 'C:\Users\<you>\Downloads\vscode-wsl-distro-manager-<version>.vsix' --force
 ```
 
 Then run **Developer: Reload Window**.
@@ -41,9 +41,9 @@ Then run **Developer: Reload Window**.
 ## 3. Local VS Code window
 
 ### View and details
-- [ ] The **WSL Distro Manager** icon appears in the activity bar, and the view lists every distro.
+- [ ] The **Distro Manager for WSL** icon appears in the activity bar, and the view lists every distro.
 - [ ] Expanding a stopped distro shows its details without starting it; it stays **Stopped**.
-- [ ] Expanding a running distro shows CPU, memory, and processes, updating every 2 seconds.
+- [ ] Expanding a running distro shows CPU, memory, and processes, updating every 2 seconds, with the VM totals in the same rows (for example `2.8 GB · VM 5.3 GB of 24.5 GB`).
 - [ ] Collapsing it, or hiding the view, stops the updates; the rows show **paused**.
 - [ ] With two VS Code windows showing the same expanded distro, both update, and only one sampling `wsl.exe` runs.
 - [ ] The **VHDX** row of a running distro shows reclaimable space only when the gap is at least 2 GB and 10% of the used space.
@@ -52,16 +52,26 @@ Then run **Developer: Reload Window**.
 - [ ] *Start* turns the icon green, opens no terminal window, and the distro is still running a minute later.
 - [ ] *Stop* turns the icon gray.
 - [ ] A distro started outside VS Code (for example from Windows Terminal) turns green within the refresh interval.
-- [ ] Stopping a distro while another runs: `cmd.exe /c ver` still works in the other one's terminal, or works again after the next refresh. **Repair Windows Interop** reports the result.
+- [ ] Stopping a distro while another runs: if `cmd.exe /c ver` stops working in the other one, a notification offers **Repair...** within about 15 seconds. Nothing is repaired without it.
+- [ ] **Repair Windows Interop** shows the exact command, runs it through `sudo`, asks for the password only if the distro requires it, rejects a wrong one without changes, and reports success.
 
 ### Distros managed by other tools
-- [ ] Podman and Docker distros show the tool's name, and their context menu has no *Set as Default*, *Edit /etc/wsl.conf*, *Convert*, *Compact Disk*, *Move*, *Back Up Folders*, or *Send Files*.
+- [ ] Podman and Docker distros show the tool's name, and their context menu has no *Set as Default*, *Compact Disk*, *Move*, *Back Up Folders*, or *Send Files*.
 - [ ] *Stop* on one of them warns that the tool manages it.
-- [ ] `wslManager.showManagedDistros: false` hides them; `true` shows them again.
+- [ ] `wslManager.showManagedDistros: false` hides them; `true` shows them again. With only managed distros installed and the setting off, the view says they are hidden.
 
 ### Configuration files
-- [ ] *Edit /etc/wsl.conf* opens the file; saving offers to restart the distro.
-- [ ] *Edit .wslconfig* opens `%USERPROFILE%\.wslconfig`; saving offers to run `wsl --shutdown`.
+- [ ] The **WSL** node is first in the view and expanded; it shows *.wslconfig* with nothing from inside the file (not in the row, not in the tooltip), and *Version* with the WSL and kernel versions. Distros list no configuration files, and no menu offers to edit `/etc/wsl.conf`.
+- [ ] Clicking *.wslconfig* opens `%USERPROFILE%\.wslconfig`; saving says the change applies after WSL (not Windows) restarts, with **Restart WSL Now**.
+- [ ] After saving without restarting, the row shows *restart WSL to apply* with a warning icon and an inline restart button, also after reloading the window.
+- [ ] **Restart WSL** from a window connected to WSL (with the extension running there) refuses and explains why.
+- [ ] **Restart WSL** lists the running distros, stops WSL, and starts again only those that were running (not Podman/Docker ones); stopped distros stay stopped, and the pending mark disappears.
+- [ ] Collapsing the **WSL** node keeps it collapsed across refreshes.
+
+### Title bar and support
+- [ ] The title bar shows Refresh, the gear, and Shut Down WSL; the gear opens Settings filtered to this extension.
+- [ ] *About* in the `...` menu shows the installed version; its buttons open the extension page, the changelog, and a new issue.
+- [ ] **View > Output > Distro Manager for WSL** starts with the version, and a backup logs each click in the list.
 
 ### Install, export, import, move
 - [ ] *Install Distro...* lists the online catalog. Installing one under a custom name works, and *Open Terminal* finishes its setup. Cancelling leaves nothing registered.
@@ -70,8 +80,11 @@ Then run **Developer: Reload Window**.
 - [ ] *Move to Another Folder...* moves the VHDX (check *Location*), and the distro still starts.
 
 ### Backups and sending files
+- [ ] In *Back Up Folders...*, checking a folder takes all of it; its ➔ opens it to choose items inside; *Everything in ...* takes the folder again and unchecks the items; *Back to ...* and ← in the title go back; choices survive navigation, and the archive holds exactly what was checked.
+- [ ] Checking *Everything in your home folder* with `.ssh` or `.aws` in it triggers the credentials warning.
 - [ ] *Back Up Folders...* lists the home folder and saves `<distro>-backup-<date>.tar.gz` to the real Desktop (also when it is in OneDrive), without `node_modules`. *Show in Folder* opens it.
 - [ ] Choosing `.zip` in a distro without `zip` says so.
+- [ ] Including `.ssh` (or `.aws`, `.kube`) asks first, says the archive is not encrypted, and mentions the cloud when the destination is in OneDrive.
 - [ ] *Send Files to Distro...* copies to `~`. Sending to `/root` reports that there is no permission and changes nothing.
 - [ ] Sending a file that already exists asks, in the prompt, whether to overwrite or skip.
 - [ ] Sending a backup asks, in the prompt, *Send and extract* or *Only send*; extracting restores it. No question appears as a notification.
@@ -79,7 +92,7 @@ Then run **Developer: Reload Window**.
 
 ### Compact Disk (on a distro you can spare)
 - [ ] The first confirmation states the expected gain, or warns that there is little to reclaim.
-- [ ] Declining the UAC prompt shows an error and leaves the distro as it was.
+- [ ] Declining the UAC prompt shows an error and leaves the distro as it was, and no `wsl-distro-manager-*.log` is left in `%TEMP%`.
 - [ ] With a VS Code window connected to WSL, it refuses before stopping anything, names that window's distro, and the connected window keeps working.
 - [ ] With no window connected and another distro running, it asks to shut WSL down, lists the running distros, and offers **Shut Down and Compact**. The progress shows the elapsed time.
 - [ ] Accepting compacts the disk, reports the size before and after, and restarts the distros that were running, except Podman and Docker ones.
@@ -104,9 +117,9 @@ publishing.
 
 | File | Shows |
 |---|---|
-| `demo.gif` | The top of the README: expanding a running distro (live metrics, reclaimable space), the context menu, and a backup. Under 5 MB, recorded with ScreenToGif at 12 fps. |
-| `overview.png` | Several distros, one expanded and running: live metrics, details, reclaimable VHDX space, Podman labels. |
-| `compact.png` | The VHDX row with reclaimable space and the *Compact Disk* confirmation. |
+| `demo.gif` *(retake: shows .wslconfig under the distro and Edit /etc/wsl.conf)* | The top of the README: expanding a running distro (live metrics, reclaimable space), the context menu, and a backup. Under 5 MB, recorded with ScreenToGif at 12 fps. |
+| `overview.png` *(retake: the row now reads `.wslconfig`, without values)* | The WSL node and several distros, one expanded and running: live metrics with VM totals, details, reclaimable VHDX space, Podman labels. |
+| `compact.png` *(retake: shows `.wslconfig` under the distro)* | The VHDX row with reclaimable space and the *Compact Disk* confirmation. |
 | `compact-shutdown.png` | The confirmation to shut WSL down for a compaction. |
 | `compact-progress.png` | The compaction progress with the elapsed time. |
-| `context-menu.png` | The context menu of a running distro. |
+| `context-menu.png` *(retake: shows Edit /etc/wsl.conf and Convert, which were removed)* | The context menu of a running distro. |

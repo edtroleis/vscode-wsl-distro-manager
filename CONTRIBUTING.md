@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping improve WSL Distro Manager. This guide covers the
+Thanks for helping improve Distro Manager for WSL. This guide covers the
 development setup, tests, localization, and releases. For how the extension
 works, read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) first.
 
@@ -56,7 +56,11 @@ The user interface is checked by hand before each release with
 - **Every user-visible string goes through `vscode.l10n.t()`**, with `{0}`
   placeholders instead of string concatenation. Write whole sentences: a
   sentence assembled from fragments cannot be translated.
-- **Nothing runs as root** except editing `/etc/wsl.conf`, and nothing shuts
+- **Programs by absolute path** (`wsl.system32()`), never by bare name.
+- **Never `wsl -u root`.** WSL grants root without a password, bypassing the
+  distro's `sudo` rules. Anything privileged inside a distro goes through its
+  `sudo`, after the user agrees, with any password on standard input. Nothing
+  elevated reads a file that another program could change first. Nothing shuts
   WSL down while VS Code windows are connected to it.
 
 ## Localization
@@ -81,40 +85,126 @@ translation is missing or has different placeholders, and CI fails if
 
 ## Pull requests
 
-1. Create a branch from `main`.
+1. Create a branch from `main`. Every push to it runs CI: the tests on Ubuntu
+   and Windows, the localization check, and packaging.
 2. Make the change, with tests when it touches parsing or logic.
 3. Run `npm test`, and `npm run smoke` if the change calls `wsl.exe`.
-4. Update `CHANGELOG.md` under **Unreleased**, and the README when behavior
-   visible to users changes.
-5. Open the pull request with a description of the problem and how you tested
-   the fix.
+4. **Raise the version** and describe the change in `CHANGELOG.md`: every merge
+   to `main` is published, so a pull request whose version is already on the
+   Marketplace fails CI.
+
+   ```bash
+   npm version patch --no-git-tag-version   # or minor / major
+   ```
+
+5. Update the README when behavior visible to users changes.
+6. Open the pull request; its template lists what to describe and check.
+   Merge it when CI passes.
+
+Report bugs and ideas with the [issue forms](https://github.com/edtroleis/vscode-wsl-distro-manager/issues/new/choose),
+and vulnerabilities as described in [SECURITY.md](SECURITY.md).
 
 ## Icons
 
+- `resources/mascot.svg` is the mascot: a penguin in a suit with a clipboard,
+  who keeps the distros in order. `resources/icon.svg` places the same drawing on
+  the brand blue; keep the two in sync.
 - `resources/icon.svg` is the source of the Marketplace icon, `resources/icon.png`
-  (256 × 256, transparent corners). After editing the SVG, render the PNG with a
-  headless browser, for example Edge:
+  (256 × 256, transparent corners), and `resources/mascot.svg` of
+  `images/mascot.png` (400 × 400, transparent), shown at the top of the README.
+  After editing an SVG, render the PNG with a headless browser, for example Edge:
   `msedge --headless=new --default-background-color=00000000 --window-size=256,256 --screenshot=icon.png icon.html`,
   where `icon.html` shows the SVG at 256 px on a transparent page.
 - `resources/wsl.svg` is the activity bar icon: a single-color outline of the
-  same drawing. VS Code only uses its shape and paints it in the theme color.
+  mascot with its clipboard, simple enough to read at 24 px. VS Code only uses
+  its shape and paints it in the theme color.
 
 ## Releases
 
-1. Move the **Unreleased** entries in `CHANGELOG.md` under the new version,
-   and update `version` in `package.json`.
-2. Build the package into a Windows folder. VS Code on Windows cannot install
-   a `.vsix` stored inside a distro.
+Releases are automatic. On every push to `main`, the **Release** workflow runs
+CI and then, if the version in `package.json` is not on the Marketplace yet,
+publishes it, tags it `v<version>`, and creates a GitHub release with the
+`.vsix` and that version's `CHANGELOG.md` section. A version that is already
+published is skipped.
+
+Before a release that changes the interface, go through
+[docs/TESTING.md](docs/TESTING.md) with a package built from the branch (CI
+uploads it as the `vsix` artifact of each run), and retake the screenshots in
+`images/`. The Marketplace loads them from GitHub.
+
+### Setup (once)
+
+The **Release** workflow publishes from the `marketplace` environment, which
+only `main` may use (Settings > Environments). Give it credentials in one of
+two ways.
+
+#### Option A: Microsoft Entra ID (recommended)
+
+GitHub Actions signs in to Azure with OIDC and gets a short-lived token; no
+secret is stored. It needs an Azure subscription to hold the managed identity (a
+free one works; the identity costs nothing).
+
+Run the `az` commands in [Azure Cloud Shell](https://portal.azure.com/#cloudshell/)
+(Bash; already signed in), or install the Azure CLI (on Fedora,
+`sudo dnf install azure-cli`) and run `az login` first (inside WSL,
+`az login --use-device-code`, since the CLI cannot open the Windows browser).
+Check the subscription with `az account show`.
+
+1. Create a user-assigned managed identity:
 
    ```bash
-   npx vsce package --out /mnt/c/Users/<you>/Downloads/
+   az group create --name vscode-publish --location eastus
+   az identity create --name vscode-wsl-distro-manager-publisher --resource-group vscode-publish
    ```
 
-3. Install it in a local VS Code window (**Extensions: Install from VSIX...**)
-   and go through [docs/TESTING.md](docs/TESTING.md).
-4. Retake screenshots in `images/` if the interface changed. They are not
-   packaged: the Marketplace loads them from GitHub, so push them first.
-5. Commit, tag (`git tag v<version>`), and push with tags.
-6. Publish with `npx vsce publish` (publisher `edtroleis`; `npx vsce login
-   edtroleis` needs a Personal Access Token with the **Marketplace > Manage**
-   scope).
+   Note its `clientId` and `tenantId`.
+2. Let this repository's `marketplace` environment sign in as it:
+
+   ```bash
+   az identity federated-credential create \
+     --name github-marketplace \
+     --identity-name vscode-wsl-distro-manager-publisher \
+     --resource-group vscode-publish \
+     --issuer https://token.actions.githubusercontent.com \
+     --subject repo:edtroleis/vscode-wsl-distro-manager:environment:marketplace \
+     --audiences api://AzureADTokenExchange
+   ```
+
+3. Store the IDs as variables of the environment (they are not secrets):
+
+   ```bash
+   gh variable set AZURE_CLIENT_ID --env marketplace --repo edtroleis/vscode-wsl-distro-manager --body <clientId>
+   gh variable set AZURE_TENANT_ID --env marketplace --repo edtroleis/vscode-wsl-distro-manager --body <tenantId>
+   ```
+
+   The identity needs no role in the subscription.
+4. Get the identity's member ID. It is a GUID that only the identity can read
+   (not its name, and not its Azure resource ID), so the **Release** workflow
+   prints it: run it (a push to `main`, or **Run workflow**) and find the
+   notice *Marketplace member ID* in the run summary. Until step 5 is done,
+   that run fails at *Publish*, which changes nothing.
+5. At <https://marketplace.visualstudio.com/manage/publishers/edtroleis>, open
+   **Members**, add that ID with the **Contributor** role, and re-run the
+   failed job.
+
+#### Option B: Azure DevOps token
+
+1. In an Azure DevOps organization (create a free one if needed), create a
+   Personal Access Token for **that organization** with the scope
+   **Marketplace > Manage**. Global tokens (*All accessible organizations*)
+   stop working on 2026-12-01.
+2. Store it as a secret of the environment; the command asks for the value:
+
+   ```bash
+   gh secret set VSCE_PAT --env marketplace --repo edtroleis/vscode-wsl-distro-manager
+   ```
+
+The token expires. When publishing fails with an authentication error,
+create a new one and run step 2 again. With both options set, the workflow
+uses Entra ID.
+
+#### Protect main
+
+Require pull requests with CI passing before merging to `main` (Settings >
+Branches), with the checks *Test (ubuntu-latest)*, *Test (windows-latest)*,
+and *Version not yet published*.

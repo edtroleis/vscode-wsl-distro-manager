@@ -1,6 +1,9 @@
 import assert = require('node:assert/strict');
 import { describe, it } from 'node:test';
-import { DistroItem, estimateReclaimable, vhdxItem } from '../tree';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { DistroItem, estimateReclaimable, setExtensionUri, vhdxItem } from '../tree';
+import { Uri } from './vscode.mock';
 import { Distro } from '../wsl';
 
 const GB = 1024 ** 3;
@@ -33,10 +36,27 @@ describe('DistroItem', () => {
 		assert.notEqual(new DistroItem(distro()).id, new DistroItem(distro({ running: false })).id);
 	});
 
-	it('colors the icon green only while running', () => {
-		const color = (d: Distro) => (new DistroItem(d).iconPath as { color?: { id: string } }).color?.id;
-		assert.equal(color(distro()), 'charts.green');
-		assert.equal(color(distro({ running: false })), undefined);
+	it('shows running distros with green SVG files, which keep their color when a row refreshes', () => {
+		setExtensionUri(Uri.file('/ext') as never);
+		const icon = new DistroItem(distro()).iconPath as { light: { path: string }; dark: { path: string } };
+		assert.equal(icon.dark.path, '/ext/resources/distro-running-dark.svg');
+		assert.equal(icon.light.path, '/ext/resources/distro-running-light.svg');
+		const managed = new DistroItem(distro({ name: 'podman-machine-default' })).iconPath as { dark: { path: string } };
+		assert.equal(managed.dark.path, '/ext/resources/managed-running-dark.svg');
+	});
+
+	it('shows stopped distros with plain theme icons', () => {
+		const icon = new DistroItem(distro({ running: false })).iconPath as { id: string; color?: unknown };
+		assert.equal(icon.id, 'vm-outline');
+		assert.equal(icon.color, undefined);
+	});
+
+	it('ships every running icon it refers to', () => {
+		for (const name of ['distro-running', 'managed-running']) {
+			for (const theme of ['light', 'dark']) {
+				assert.ok(fs.existsSync(path.join(__dirname, '..', '..', 'resources', `${name}-${theme}.svg`)), `${name}-${theme}.svg`);
+			}
+		}
 	});
 
 	it('restores expansion given by the provider', () => {

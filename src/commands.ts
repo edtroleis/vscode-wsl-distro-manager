@@ -6,9 +6,12 @@ import { Distro } from './wsl';
 import { formatBytes } from './monitor';
 import { formatElapsed, withFileProgress, withProgress } from './progress';
 import { promptText } from './prompts';
+import { clearPending, pendingSince } from './pending';
 import { registerTransferCommands } from './transfer';
+import { offerInteropRepair, repairInterop } from './interop';
 import { DistroItem, DistroTreeProvider, InfoItem, estimateReclaimable } from './tree';
-import { distroUri, globalUri } from './configFs';
+import { globalUri } from './configFs';
+import { log } from './log';
 
 function config() {
 	return vscode.workspace.getConfiguration('wslManager');
@@ -24,7 +27,8 @@ function terminalWslPath(): string {
 	if (configured) {
 		return configured;
 	}
-	return vscode.env.remoteName === 'wsl' ? '/mnt/c/Windows/System32/wsl.exe' : 'wsl.exe';
+	// Absolute, never looked up by name (see wsl.system32).
+	return vscode.env.remoteName === 'wsl' ? '/mnt/c/Windows/System32/wsl.exe' : wsl.system32('wsl.exe');
 }
 
 async function pickDistro(
@@ -138,20 +142,6 @@ async function confirmIfManaged(distro: string, message: string, confirmLabel: s
 	return choice === confirmLabel;
 }
 
-/** Confirms restarting the current window's distro; any other distro passes through. */
-export async function confirmRestartIfCurrentWindow(distro: string): Promise<boolean> {
-	if (!wsl.isCurrentWindowDistro(distro)) {
-		return true;
-	}
-	const restart = vscode.l10n.t('Restart');
-	const choice = await vscode.window.showWarningMessage(
-		vscode.l10n.t('Restart "{0}"?', distro),
-		{ modal: true, detail: vscode.l10n.t('"{0}" is the distro of this window. {1}', distro, windowWarning()) },
-		restart,
-	);
-	return choice === restart;
-}
-
 /**
  * Always asks: a shutdown stops every distro, including ones other tools
  * (Docker, Podman) depend on, and those are not restarted for them.
@@ -183,15 +173,12 @@ async function confirmShutdown(
 }
 
 /**
- * Stopping a distro unregisters Windows interop in the other running distros
- * (see wsl.restoreInterop). Put it back right after our own stops.
+ * Stopping a distro makes WSL remove Windows interop from the other running
+ * distros. Check right after our own stops and offer the repair (which runs
+ * through sudo, with the user's consent).
  */
-async function healInteropAfterStop(): Promise<void> {
-	const running = (await wsl.list()).filter((d) => d.running).map((d) => d.name);
-	const restored = await wsl.restoreInterop(running).catch(() => []);
-	if (restored.length > 0) {
-		vscode.window.setStatusBarMessage(vscode.l10n.t('$(check) Restored Windows interop in {0}', restored.join(', ')), 8000);
-	}
+function healInteropAfterStop(): void {
+	void offerInteropRepair().catch(() => undefined);
 }
 
 /** The distro's VHDX, as Windows and as this host see it. */
@@ -243,14 +230,12 @@ async function releaseDisk(
 	distro: Distro,
 	vhd: string,
 	texts: { progress: string; shutdownTitle: string; shutdownLabel: string; shutdownDetail?: string },
-	beforeStop?: () => Promise<void>,
 ): Promise<{ released: boolean; restart: string[] }> {
 	let restart = distro.running ? [distro.name] : [];
 	const free = await withProgress(texts.progress, async () => {
 		if (distro.running) {
-			await beforeStop?.();
 			await wsl.terminate(distro.name);
-			await healInteropAfterStop();
+			healInteropAfterStop();
 		}
 		return wsl.waitUntilUnlocked(vhd, 5000);
 	});
@@ -262,11 +247,12 @@ async function releaseDisk(
 			vscode.l10n.t('The disk of "{0}" stays attached while WSL is running, and shutting WSL down would stop this extension, which runs inside WSL. Run the command from a local VS Code window.', distro.name),
 		);
 	}
-	const running = (await wsl.list()).filter((d) => d.running).map((d) => d.name);
+	const distros = await wsl.list();
+	const running = distros.filter((d) => d.running).map((d) => d.name);
 	if (!(await confirmShutdown(distro.name, texts.shutdownTitle, texts.shutdownLabel, running, texts.shutdownDetail))) {
 		return { released: false, restart };
 	}
-	restart = [...new Set([...restart, ...running])].filter((name) => !wsl.managedBy(name));
+	restart = [...new Set([...restart, ...wsl.distrosToStartAgain(distros)])];
 	const released = await withProgress(vscode.l10n.t('Shutting down WSL...'), async () => {
 		await wsl.shutdown();
 		return wsl.waitUntilUnlocked(vhd, 15000);
@@ -288,9 +274,6 @@ async function startAgain(names: string[]): Promise<void> {
 	});
 }
 
-
-
-
 export function registerCommands(
 	context: vscode.ExtensionContext,
 	tree: DistroTreeProvider,
@@ -302,6 +285,7 @@ export function registerCommands(
 					await handler(...args);
 				} catch (error) {
 					const message = error instanceof Error ? error.message : String(error);
+					log().error(`${id}: ${message}`);
 					vscode.window.showErrorMessage(vscode.l10n.t('WSL: {0}', message));
 					tree.refresh();
 				}
@@ -366,7 +350,7 @@ export function registerCommands(
 		}
 		await withProgress(vscode.l10n.t('Stopping {0}...', distro.name), async () => {
 			await wsl.terminate(distro.name);
-			await healInteropAfterStop();
+			healInteropAfterStop();
 		});
 		tree.refresh();
 	});
@@ -386,6 +370,8 @@ export function registerCommands(
 		}
 		await withProgress(vscode.l10n.t('Restarting {0}...', distro.name), async () => {
 			await wsl.terminate(distro.name);
+			// Stopping it removed interop from the other running distros.
+			healInteropAfterStop();
 			await wsl.start(distro.name);
 		});
 		tree.refresh();
@@ -401,26 +387,6 @@ export function registerCommands(
 		}
 		await wsl.setDefault(distro.name);
 		vscode.window.showInformationMessage(vscode.l10n.t('"{0}" is now the default distro.', distro.name));
-		tree.refresh();
-	});
-
-	register('wslManager.setVersion', async (arg: unknown) => {
-		const distro = await resolveDistro(arg, vscode.l10n.t('Convert which distro?'));
-		if (!distro) {
-			return;
-		}
-		const target = distro.version === 2 ? 1 : 2;
-		const ok = await confirmDistroAction(
-			distro.name,
-			vscode.l10n.t('Convert "{0}" from WSL {1} to WSL {2}? The conversion copies the entire file system and may take several minutes.', distro.name, distro.version, target),
-			vscode.l10n.t('Convert to WSL {0}', target),
-		);
-		if (!ok) {
-			return;
-		}
-		await withProgress(vscode.l10n.t('Converting {0} to WSL {1}...', distro.name, target), () =>
-			wsl.setVersion(distro.name, target as 1 | 2),
-		);
 		tree.refresh();
 	});
 
@@ -447,7 +413,11 @@ export function registerCommands(
 		const expected = isVhd ? disk?.size : used;
 		const exported = await withFileProgress(vscode.l10n.t('Exporting {0}', distro.name), targetHost, expected, (signal) =>
 			wsl.exportDistro(distro.name, targetPath, isVhd, signal),
-		);
+		).catch(async (error: unknown) => {
+			// A failed export leaves a truncated file that looks like a backup.
+			await fs.rm(targetHost, { force: true });
+			throw error;
+		});
 		if (exported === undefined) {
 			await fs.rm(targetHost, { force: true });
 			vscode.window.showInformationMessage(vscode.l10n.t('Export of "{0}" cancelled; the partial file was removed.', distro.name));
@@ -555,7 +525,7 @@ export function registerCommands(
 		}
 		await withProgress(vscode.l10n.t('Unregistering {0}...', distro.name), async () => {
 			await wsl.unregister(distro.name);
-			await healInteropAfterStop();
+			healInteropAfterStop();
 		});
 		vscode.window.showInformationMessage(vscode.l10n.t('"{0}" was unregistered.', distro.name));
 		tree.refresh();
@@ -572,23 +542,63 @@ export function registerCommands(
 			return;
 		}
 		await withProgress(vscode.l10n.t('Shutting down WSL...'), () => wsl.shutdown());
+		// The VM stopped, so a saved .wslconfig applies when it starts again.
+		await clearPending();
 		tree.refresh();
+	});
+
+	register('wslManager.restartWsl', async () => {
+		// The shutdown would stop this extension before it starts the distros again.
+		if (process.platform !== 'win32') {
+			vscode.window.showWarningMessage(
+				vscode.l10n.t('This extension runs inside WSL, so restarting WSL would stop it before it could start the distros again. Run Restart WSL from a local VS Code window (not connected to WSL).'),
+			);
+			return;
+		}
+		const distros = await wsl.list();
+		const running = distros.filter((d) => d.running).map((d) => d.name);
+		const toStart = wsl.distrosToStartAgain(distros);
+		const managed = running.filter((name) => wsl.managedBy(name));
+		const connected = await wsl.vscodeConnectedDistros().catch(() => []);
+		const detail = [
+			running.length > 0
+				? vscode.l10n.t('Running now: {0}. They stop and start again; stopped distros stay stopped.', running.join(', '))
+				: vscode.l10n.t('No distro is running; they all stay stopped.'),
+			managed.length > 0
+				? vscode.l10n.t('{0} belong to Docker, Podman, or Rancher Desktop and are not started again; start them from that tool.', managed.join(', '))
+				: '',
+			connected.length > 0
+				? vscode.l10n.t('VS Code windows connected to {0} lose their connection; if one does not reconnect, run "Developer: Reload Window" in it.', connected.join(', '))
+				: '',
+			vscode.l10n.t('Every WSL terminal will be closed. Windows does not restart.'),
+		].filter(Boolean);
+		const label = vscode.l10n.t('Restart WSL');
+		const choice = await vscode.window.showWarningMessage(
+			pendingSince() !== undefined ? vscode.l10n.t('Restart WSL to apply .wslconfig?') : vscode.l10n.t('Restart WSL?'),
+			{ modal: true, detail: detail.join('\n\n') },
+			label,
+		);
+		if (choice !== label) {
+			return;
+		}
+		await withProgress(vscode.l10n.t('Restarting WSL...'), async () => {
+			await wsl.shutdown();
+			await clearPending();
+			for (const name of toStart) {
+				await wsl.start(name).catch(() => undefined);
+			}
+		});
+		tree.invalidateDetails();
+		tree.refresh();
+		vscode.window.showInformationMessage(
+			toStart.length > 0
+				? vscode.l10n.t('WSL restarted; {0} started again.', toStart.join(', '))
+				: vscode.l10n.t('WSL restarted; no distro was running, so none was started.'),
+		);
 	});
 
 	register('wslManager.editWslConfig', async () => {
 		const doc = await vscode.workspace.openTextDocument(globalUri());
-		await vscode.window.showTextDocument(doc);
-	});
-
-	register('wslManager.editWslConf', async (arg: unknown) => {
-		const distro = await resolveDistro(arg, vscode.l10n.t('Edit wsl.conf of which distro?'));
-		if (!distro) {
-			return;
-		}
-		if (!(await confirmIfManaged(distro.name, vscode.l10n.t('Edit /etc/wsl.conf of "{0}"?', distro.name), vscode.l10n.t('Edit')))) {
-			return;
-		}
-		const doc = await vscode.workspace.openTextDocument(distroUri(distro.name));
 		await vscode.window.showTextDocument(doc);
 	});
 
@@ -630,24 +640,13 @@ export function registerCommands(
 
 		let restart: string[] = [];
 		try {
-			const release = await releaseDisk(
-				distro,
-				vhd,
-				{
-					progress: vscode.l10n.t('Compacting {0}: releasing the disk...', distro.name),
-					shutdownTitle: vscode.l10n.t('Shut down WSL to compact "{0}"?', distro.name),
-					shutdownLabel: vscode.l10n.t('Shut Down and Compact'),
-					shutdownDetail:
-						reclaimable !== undefined ? vscode.l10n.t('Expected gain: about {0}.', formatBytes(reclaimable)) : undefined,
-				},
-				// WSL mounts with discard, so this mostly catches leftovers; it is cheap.
-				() =>
-					wsl
-						.run(['--distribution', distro.name, '--user', 'root', '--exec', '/bin/sh', '-c', 'fstrim -a'], {
-							tolerateFailure: true,
-						})
-						.then(() => undefined),
-			);
+			const release = await releaseDisk(distro, vhd, {
+				progress: vscode.l10n.t('Compacting {0}: releasing the disk...', distro.name),
+				shutdownTitle: vscode.l10n.t('Shut down WSL to compact "{0}"?', distro.name),
+				shutdownLabel: vscode.l10n.t('Shut Down and Compact'),
+				shutdownDetail:
+					reclaimable !== undefined ? vscode.l10n.t('Expected gain: about {0}.', formatBytes(reclaimable)) : undefined,
+			});
 			restart = release.restart;
 			if (!release.released) {
 				return;
@@ -875,15 +874,7 @@ export function registerCommands(
 		}
 	});
 
-	register('wslManager.repairInterop', async () => {
-		const running = (await wsl.list()).filter((d) => d.running).map((d) => d.name);
-		const restored = await withProgress(vscode.l10n.t('Checking Windows interop...'), () => wsl.restoreInterop(running));
-		vscode.window.showInformationMessage(
-			restored.length > 0
-				? vscode.l10n.t('Restored Windows interop in {0}.', restored.join(', '))
-				: vscode.l10n.t('Windows interop is working in every running distro.'),
-		);
-	});
+	register('wslManager.repairInterop', () => repairInterop());
 
 	register('wslManager.copyName', async (arg: unknown) => {
 		const distro = await resolveDistro(arg, vscode.l10n.t('Copy the name of which distro?'));
@@ -891,6 +882,7 @@ export function registerCommands(
 			return;
 		}
 		await vscode.env.clipboard.writeText(distro.name);
+		vscode.window.setStatusBarMessage(vscode.l10n.t('$(check) Copied "{0}"', distro.name), 3000);
 	});
 
 	registerTransferCommands(register, resolveDistro);

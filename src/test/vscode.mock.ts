@@ -107,5 +107,8 @@ export const l10n = {
 		message.replace(/\{(\d+)\}/g, (match, index) => (Number(index) < args.length ? String(args[Number(index)]) : match)),
 };
 
-export const window = {};
+const noop = () => undefined;
+export const window = {
+	createOutputChannel: () => ({ trace: noop, debug: noop, info: noop, warn: noop, error: noop, appendLine: noop, dispose: noop }),
+};
 export const commands = {};

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- A running distro: a screen with a check, in VS Code's charts.green for the light theme. -->
+  <g fill="none" stroke="#388A34" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="1.6" y="2.1" width="12.8" height="8.8" rx="1.2"/>
+    <path d="M5.5 13.9h5M8 10.9v3"/>
+    <path d="M5.4 6.6l1.8 1.8 3.4-3.6"/>
+  </g>
+</svg>

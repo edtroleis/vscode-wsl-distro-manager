@@ -2,7 +2,20 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { DistroMonitor, formatBytes } from './monitor';
-import { Distro, isCurrentWindowDistro, list, managedBy, registryInfo, restoreInterop, runtimeInfo, toHostPath } from './wsl';
+import {
+	Distro,
+	isCurrentWindowDistro,
+	list,
+	managedBy,
+	registryInfo,
+	runtimeInfo,
+	toHostPath,
+	vmUptime,
+	wslConfigFile,
+	wslVersion,
+} from './wsl';
+import { clearPending, pendingSince, restartedSince } from './pending';
+import { offerInteropRepair } from './interop';
 
 /**
  * How much a compaction would likely give back, or undefined when it is not
@@ -18,6 +31,30 @@ export function estimateReclaimable(vhdxSize: number, used: number | undefined):
 	}
 	const gap = vhdxSize - used;
 	return gap >= Math.max(2 * 1024 ** 3, used * 0.1) ? gap : undefined;
+}
+
+let extensionUri: vscode.Uri | undefined;
+
+/** Where the bundled icons live; set once on activation. */
+export function setExtensionUri(uri: vscode.Uri): void {
+	extensionUri = uri;
+}
+
+/**
+ * The icon of a running distro, as a green SVG file. A ThemeIcon tinted with
+ * charts.green lost its color whenever the view refreshed a row that kept its
+ * id (every auto-refresh): VS Code updates the icon's shape but not its color.
+ * A file icon carries its own color. One file per theme, in charts.green.
+ */
+export function runningIcon(managed: boolean): vscode.TreeItem['iconPath'] {
+	if (!extensionUri) {
+		return new vscode.ThemeIcon(managed ? 'package' : 'vm-active', new vscode.ThemeColor('charts.green'));
+	}
+	const name = managed ? 'managed-running' : 'distro-running';
+	return {
+		light: vscode.Uri.joinPath(extensionUri, 'resources', `${name}-light.svg`),
+		dark: vscode.Uri.joinPath(extensionUri, 'resources', `${name}-dark.svg`),
+	};
 }
 
 export class DistroItem extends vscode.TreeItem {
@@ -48,16 +85,16 @@ export class DistroItem extends vscode.TreeItem {
 		}
 		this.description = badges.join(' · ');
 
-		const icon = managed ? 'package' : distro.running ? 'vm-active' : 'vm-outline';
 		this.iconPath = distro.running
-			? new vscode.ThemeIcon(icon, new vscode.ThemeColor('charts.green'))
-			: new vscode.ThemeIcon(icon);
+			? runningIcon(!!managed)
+			: new vscode.ThemeIcon(managed ? 'package' : 'vm-outline');
 
 		const tooltip = new vscode.MarkdownString();
 		tooltip.appendMarkdown(`**${distro.name}**\n\n`);
-		tooltip.appendMarkdown(vscode.l10n.t('- State: {0}\n', distro.running ? 'Running' : 'Stopped'));
+		const state = distro.running ? vscode.l10n.t('Running') : vscode.l10n.t('Stopped');
+		tooltip.appendMarkdown(vscode.l10n.t('- State: {0}\n', state));
 		tooltip.appendMarkdown(vscode.l10n.t('- Version: WSL {0}\n', distro.version));
-		tooltip.appendMarkdown(vscode.l10n.t('- Default: {0}\n', distro.isDefault ? 'yes' : 'no'));
+		tooltip.appendMarkdown(vscode.l10n.t('- Default: {0}\n', distro.isDefault ? vscode.l10n.t('yes') : vscode.l10n.t('no')));
 		if (managed) {
 			tooltip.appendMarkdown(vscode.l10n.t('\nManaged by **{0}**. {1}\n', managed.tool, managed.hint));
 		}
@@ -100,17 +137,6 @@ export class InfoItem extends vscode.TreeItem {
 	}
 }
 
-class ConfigFileItem extends vscode.TreeItem {
-	constructor(parent: DistroItem, label: string, description: string, command: string) {
-		super(label, vscode.TreeItemCollapsibleState.None);
-		this.id = `${parent.id}/config/${label}`;
-		this.description = description;
-		this.iconPath = new vscode.ThemeIcon('gear');
-		this.contextValue = 'wslConfigFile';
-		this.command = { command, title: vscode.l10n.t('Edit {0}', label), arguments: [parent] };
-	}
-}
-
 /**
  * The VHDX only grows: space freed inside the distro stays allocated in the
  * file. Comparing its size with what the distro actually uses (known only while
@@ -132,6 +158,68 @@ export function vhdxItem(parent: DistroItem, vhdWindows: string, size: number, u
 	const item = new InfoItem(parent, vscode.l10n.t('VHDX'), value, reclaimable !== undefined ? 'warning' : 'file-binary', tooltip);
 	// Managed distros get no inline Compact button: their tool owns the disk.
 	item.contextValue = parent.distro.version === 2 && !managedBy(parent.distro.name) ? 'wslVhdx' : 'wslInfo';
+	return item;
+}
+
+/**
+ * The first node of the view: what applies to WSL as a whole, not to one
+ * distro. The global .wslconfig lives here instead of being repeated under
+ * every distro, next to the WSL and kernel versions.
+ */
+export class GlobalItem extends vscode.TreeItem {
+	constructor(expanded: boolean) {
+		super('WSL', expanded ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed);
+		this.id = 'global';
+		this.description = vscode.l10n.t('all distros');
+		this.tooltip = vscode.l10n.t('Settings and versions that apply to WSL as a whole');
+		this.iconPath = new vscode.ThemeIcon('server-environment');
+		this.contextValue = 'wslGlobal';
+	}
+}
+
+/**
+ * The .wslconfig row. It shows nothing from inside the file; a click opens it.
+ * While a saved change waits for WSL to restart, the row says so and offers the
+ * restart inline.
+ */
+export function wslConfigItem(
+	exists: boolean,
+	file: string,
+	pending = false,
+): vscode.TreeItem {
+	// Only a state that needs attention goes next to the name.
+	const item = new vscode.TreeItem('.wslconfig', vscode.TreeItemCollapsibleState.None);
+	item.id = 'global/wslconfig';
+	item.description = pending
+		? vscode.l10n.t('restart WSL to apply')
+		: exists
+			? undefined
+			: vscode.l10n.t('not created');
+	item.tooltip = [
+		file,
+		'',
+		pending
+			? vscode.l10n.t('Saved changes are not applied yet: restart WSL (not Windows) to apply them.')
+			: vscode.l10n.t('Changes apply to every distro after WSL restarts. Windows does not need to restart.'),
+	].join('\n');
+	item.iconPath = pending
+		? new vscode.ThemeIcon('warning', new vscode.ThemeColor('list.warningForeground'))
+		: new vscode.ThemeIcon('gear');
+	item.contextValue = pending ? 'wslGlobalConfig.pending' : 'wslGlobalConfig';
+	item.command = { command: 'wslManager.editWslConfig', title: vscode.l10n.t('Edit {0}', '.wslconfig') };
+	return item;
+}
+
+export function wslVersionItem(version: { wsl: string; kernel?: string } | undefined): vscode.TreeItem {
+	const item = new vscode.TreeItem(vscode.l10n.t('Version'), vscode.TreeItemCollapsibleState.None);
+	item.id = 'global/version';
+	item.description = version
+		? version.kernel
+			? vscode.l10n.t('WSL {0} · kernel {1}', version.wsl, version.kernel)
+			: `WSL ${version.wsl}`
+		: vscode.l10n.t('unknown (run "wsl --update")');
+	item.iconPath = new vscode.ThemeIcon('info');
+	item.contextValue = 'wslInfo';
 	return item;
 }
 
@@ -170,9 +258,11 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 	/** Expanded distros by name, since a state change gives the item a new id. */
 	private readonly expanded = new Set<string>();
 
+	/** The WSL node starts expanded; remember when the user collapses it. */
+	private collapsedGlobal = false;
+
 	/** Running distros at the last refresh, to notice distros that stopped. */
 	private lastRunning: Set<string> | undefined;
-	private restoringInterop = false;
 
 	refresh(): void {
 		this.changed.fire();
@@ -186,6 +276,21 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 		if (element instanceof DistroItem) {
 			return this.distroChildren(element);
 		}
+		if (element instanceof GlobalItem) {
+			const [config, version, pending] = await Promise.all([
+				wslConfigFile().catch(() => undefined),
+				wslVersion(),
+				this.stillPending(),
+			]);
+			return [
+				wslConfigItem(
+					config?.exists ?? false,
+					config?.path ?? '.wslconfig',
+					pending,
+				),
+				wslVersionItem(version),
+			];
+		}
 		if (element) {
 			return [];
 		}
@@ -198,9 +303,21 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 			const showManaged = vscode.workspace
 				.getConfiguration('wslManager')
 				.get<boolean>('showManagedDistros', true);
-			return distros
+			const items = distros
 				.filter((d) => showManaged || !managedBy(d.name))
 				.map((d) => new DistroItem(d, this.expanded.has(d.name)));
+			// With no distros at all, show nothing so the welcome view (Install / Import) appears.
+			if (distros.length === 0) {
+				return [];
+			}
+			const hidden = distros.length - items.length;
+			return [
+				new GlobalItem(!this.collapsedGlobal),
+				...items,
+				...(items.length === 0
+					? [new MessageItem(vscode.l10n.t('{0} Docker, Podman, or Rancher distros are hidden (wslManager.showManagedDistros).', hidden), 'eye-closed')]
+					: []),
+			];
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			return [new MessageItem(vscode.l10n.t('Failed to query wsl.exe: {0}', message), 'error')];
@@ -208,31 +325,48 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 	}
 
 	/**
-	 * A distro that stops, for whatever reason (Stop, idle timeout), takes
-	 * Windows interop away from every other running distro. When a refresh
-	 * shows that a distro stopped, re-register it in the ones still running.
+	 * A distro that stops, for whatever reason (Stop, idle timeout), makes WSL
+	 * remove Windows interop from every other running distro. When a refresh
+	 * shows that a distro stopped, check (as the default user) and, if interop
+	 * is gone, offer to repair it; nothing runs with privileges unless the user
+	 * agrees and sudo allows it.
 	 */
 	private healInteropIfSomethingStopped(running: Set<string>): void {
 		const previous = this.lastRunning;
 		this.lastRunning = running;
 		const stopped = previous ? [...previous].some((name) => !running.has(name)) : false;
-		if (!stopped || running.size === 0 || this.restoringInterop) {
-			return;
+		if (stopped && running.size > 0) {
+			void offerInteropRepair([...running]).catch(() => undefined);
 		}
-		this.restoringInterop = true;
-		restoreInterop([...running])
-			.then((restored) => {
-				if (restored.length > 0) {
-					vscode.window.setStatusBarMessage(vscode.l10n.t('$(check) Restored Windows interop in {0}', restored.join(', ')), 8000);
-				}
-			})
-			.catch(() => undefined)
-			.finally(() => (this.restoringInterop = false));
+	}
+
+	/**
+	 * Whether a saved .wslconfig still waits for WSL to restart. A running
+	 * distro tells how long the VM has been up; if it booted after the save,
+	 * the change is applied. With nothing running, it cannot tell, so it stays
+	 * pending (the VM may still be up).
+	 */
+	private async stillPending(): Promise<boolean> {
+		const savedAt = pendingSince();
+		if (savedAt === undefined) {
+			return false;
+		}
+		const running = [...(this.lastRunning ?? [])];
+		if (running.length === 0) {
+			return true;
+		}
+		const uptime = await vmUptime(running[0]).catch(() => undefined);
+		if (uptime !== undefined && restartedSince(savedAt, uptime)) {
+			await clearPending();
+			return false;
+		}
+		return true;
 	}
 
 	/** Drops the details cache; used by the manual refresh. */
 	invalidateDetails(): void {
 		this.details.clear();
+		void wslVersion(true);
 	}
 
 	private monitorFor(name: string): DistroMonitor {
@@ -335,10 +469,6 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 			}
 		}
 
-		children.push(
-			new ConfigFileItem(item, '/etc/wsl.conf', vscode.l10n.t('this distro'), 'wslManager.editWslConf'),
-			new ConfigFileItem(item, '.wslconfig', vscode.l10n.t('global (all distros)'), 'wslManager.editWslConfig'),
-		);
 		return children;
 	}
 
@@ -360,12 +490,18 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 			}),
 			// Re-expanding an already loaded node does not call getChildren again.
 			view.onDidExpandElement((e) => {
+				if (e.element instanceof GlobalItem) {
+					this.collapsedGlobal = false;
+				}
 				if (e.element instanceof DistroItem) {
 					this.expanded.add(e.element.distro.name);
 					this.startMonitor(e.element.distro);
 				}
 			}),
 			view.onDidCollapseElement((e) => {
+				if (e.element instanceof GlobalItem) {
+					this.collapsedGlobal = true;
+				}
 				if (e.element instanceof DistroItem) {
 					this.expanded.delete(e.element.distro.name);
 					this.monitors.get(e.element.distro.name)?.stop();

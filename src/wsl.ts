@@ -1,4 +1,5 @@
 import { ChildProcess, spawn } from 'child_process';
+import { randomUUID } from 'crypto';
 import * as fsSync from 'fs';
 import * as fs from 'fs/promises';
 import * as os from 'os';
@@ -28,17 +29,27 @@ export function decode(buf: Buffer): string {
 	return buf.toString('utf8');
 }
 
+/**
+ * A program in Windows' System32, by absolute path. Programs are never looked
+ * up by bare name: a same-named executable earlier in the PATH (or, on older
+ * runtimes, in the current folder) would run instead, and some of these run
+ * with administrator rights after a UAC prompt.
+ */
+export function system32(program: string): string {
+	if (process.platform !== 'win32') {
+		return `/mnt/c/Windows/System32/${program.replace(/\\/g, '/')}`;
+	}
+	return path.win32.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', program);
+}
+
+/** wslpath, by absolute path, when the extension runs inside WSL. */
+const WSLPATH = '/usr/bin/wslpath';
+
 export function wslExePath(): string {
 	const configured = vscode.workspace.getConfiguration('wslManager').get<string>('wslExePath');
-	if (configured) {
-		return configured;
-	}
 	// Even with extensionKind "ui" the host can be Linux when the window is
-	// connected to a distro; in that case we call wsl.exe through interop.
-	if (process.platform !== 'win32') {
-		return '/mnt/c/Windows/System32/wsl.exe';
-	}
-	return 'wsl.exe';
+	// connected to a distro; system32() then points at wsl.exe through interop.
+	return configured || system32('wsl.exe');
 }
 
 export interface RunOptions {
@@ -70,7 +81,7 @@ export interface RunResult {
 export const interopBrokenMessage = () =>
 	vscode.l10n.t(
 		'Windows interop is disabled in this distro, so it cannot run wsl.exe. This is a known WSL issue: when a distro stops, interop is unregistered in every other running distro. Run "Repair Windows Interop" from a local VS Code window, or restore it here with: {0}',
-		'sudo sh -c "echo :WSLInterop:M::MZ::/init:P > /proc/sys/fs/binfmt_misc/register"',
+		INTEROP_REPAIR_COMMAND,
 	);
 
 /**
@@ -98,7 +109,7 @@ export function interopBroken(binfmtDir = '/proc/sys/fs/binfmt_misc'): boolean {
  */
 function killTree(child: ChildProcess): void {
 	if (process.platform === 'win32' && child.pid !== undefined) {
-		spawn('taskkill.exe', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }).on(
+		spawn(system32('taskkill.exe'), ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }).on(
 			'error',
 			() => child.kill(),
 		);
@@ -192,14 +203,14 @@ async function windowsDir(variable: 'USERPROFILE' | 'TEMP'): Promise<string> {
 	if (cached) {
 		return cached;
 	}
-	const echoed = await spawnCapture('/mnt/c/Windows/System32/cmd.exe', ['/c', `echo %${variable}%`], {
+	const echoed = await spawnCapture(system32('cmd.exe'), ['/c', `echo %${variable}%`], {
 		cwd: '/mnt/c',
 	});
 	const windowsPath = echoed.stdout.trim();
 	if (!windowsPath || windowsPath.includes(`%${variable}%`)) {
 		throw new Error(vscode.l10n.t('Could not determine the Windows %{0}%.', variable));
 	}
-	const translated = (await spawnCapture('wslpath', ['-u', windowsPath])).stdout.trim();
+	const translated = (await spawnCapture(WSLPATH, ['-u', windowsPath])).stdout.trim();
 	windowsDirs.set(variable, translated);
 	return translated;
 }
@@ -222,7 +233,11 @@ function lines(raw: string): string[] {
  * is always the version.
  */
 export async function list(): Promise<Distro[]> {
-	const quiet = (await run(['--list', '--quiet'])).stdout;
+	// With no distro installed, wsl.exe exits non-zero with a localized message
+	// ("... has no installed distributions"), which must not be read as names.
+	// A missing wsl.exe still throws (the process cannot start).
+	const quietResult = await run(['--list', '--quiet'], { tolerateFailure: true });
+	const quiet = quietResult.code === 0 ? quietResult.stdout : '';
 	if (lines(quiet).length === 0) {
 		return [];
 	}
@@ -261,8 +276,6 @@ export function parseDistroList(quiet: string, running: string, verbose: string)
 
 export const terminate = (name: string) => run(['--terminate', name]);
 export const setDefault = (name: string) => run(['--set-default', name]);
-export const setVersion = (name: string, version: 1 | 2) =>
-	run(['--set-version', name, String(version)]);
 export const shutdown = () => run(['--shutdown']);
 export const unregister = (name: string) => run(['--unregister', name]);
 
@@ -282,12 +295,13 @@ export const unregister = (name: string) => run(['--unregister', name]);
  */
 export async function start(name: string): Promise<void> {
 	await run(['--distribution', name, '--exec', '/bin/true']);
-	const args = ['--distribution', name, '--exec', '/bin/sleep', '2147483647']
-		.map((a) => `'${a.replace(/'/g, "''")}'`)
-		.join(',');
+	const quote = (a: string) => `'${a.replace(/'/g, "''")}'`;
+	const args = ['--distribution', name, '--exec', '/bin/sleep', '2147483647'].map(quote).join(',');
+	// PowerShell runs on Windows: a configured wslExePath only applies there as-is.
+	const exe = process.platform === 'win32' ? wslExePath() : 'C:\\Windows\\System32\\wsl.exe';
 	await spawnCapture(
 		powershellPath(),
-		['-NoProfile', '-NonInteractive', '-Command', `Start-Process -FilePath wsl.exe -WindowStyle Hidden -ArgumentList ${args}`],
+		['-NoProfile', '-NonInteractive', '-Command', `Start-Process -FilePath ${quote(exe)} -WindowStyle Hidden -ArgumentList ${args}`],
 		{ cwd: process.platform === 'win32' ? undefined : '/mnt/c' },
 	);
 }
@@ -347,28 +361,6 @@ export function parseOnlineList(stdout: string): OnlineDistro[] {
 	return distros;
 }
 
-/**
- * Reads a file inside the distro as root. Going through `wsl --exec` instead of
- * the \\wsl.localhost share avoids "permission denied" under /etc, since the
- * share accesses the distro as the default user. The path is passed as a shell
- * argument ($1) so it is never reinterpreted.
- */
-export async function readFileAsRoot(distro: string, path: string): Promise<string | undefined> {
-	const result = await run(
-		['--distribution', distro, '--user', 'root', '--exec', '/bin/sh', '-c', 'cat "$1"', 'sh', path],
-		{ tolerateFailure: true },
-	);
-	return result.code === 0 ? result.stdout : undefined;
-}
-
-/** Writes a file inside the distro as root, preserving /etc permissions. */
-export async function writeFileAsRoot(distro: string, path: string, content: Buffer): Promise<void> {
-	await run(
-		['--distribution', distro, '--user', 'root', '--exec', '/bin/sh', '-c', 'cat > "$1"', 'sh', path],
-		{ stdin: content },
-	);
-}
-
 export interface RegistryDistro {
 	basePath?: string;
 	vhdFileName?: string;
@@ -382,9 +374,8 @@ export interface RegistryDistro {
  * only exists in the registry, one subkey per distro under HKCU\...\Lxss.
  */
 export async function registryInfo(): Promise<Map<string, RegistryDistro>> {
-	const regExe = process.platform === 'win32' ? 'reg.exe' : '/mnt/c/Windows/System32/reg.exe';
 	const result = await spawnCapture(
-		regExe,
+		system32('reg.exe'),
 		['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss', '/s'],
 		{ cwd: process.platform === 'win32' ? undefined : '/mnt/c', tolerateFailure: true },
 	);
@@ -423,7 +414,7 @@ export async function toHostPath(windowsPath: string): Promise<string> {
 	if (process.platform === 'win32') {
 		return windowsPath;
 	}
-	return (await spawnCapture('wslpath', ['-u', windowsPath])).stdout.trim();
+	return (await spawnCapture(WSLPATH, ['-u', windowsPath])).stdout.trim();
 }
 
 export interface RuntimeInfo {
@@ -474,7 +465,7 @@ export async function toWindowsPath(uri: vscode.Uri): Promise<string> {
 		if (process.platform === 'win32') {
 			return uri.fsPath;
 		}
-		return (await spawnCapture('wslpath', ['-w', uri.path])).stdout.trim();
+		return (await spawnCapture(WSLPATH, ['-w', uri.path])).stdout.trim();
 	}
 	const remote = /^wsl\+(.+)$/i.exec(uri.authority);
 	if (uri.scheme === 'vscode-remote' && remote) {
@@ -528,7 +519,7 @@ export function isCurrentWindowDistro(name: string): boolean {
 }
 
 /**
- * Distros created and driven by other tools. Stopping, converting, or
+ * Distros created and driven by other tools. Stopping, moving, or
  * unregistering them from here breaks that tool, so the UI labels them and
  * warns before touching them.
  */
@@ -551,42 +542,56 @@ export interface CompactResult {
 }
 
 /**
+ * The PowerShell script that runs elevated: it pipes the diskpart commands in
+ * and writes diskpart's output to `log`. The commands travel inside the
+ * elevated process's own command line (-EncodedCommand), never through a file
+ * that another program could change between the UAC prompt and the run.
+ */
+export function diskpartScript(vhd: string, log: string, program = DISKPART): string {
+	const quote = (s: string) => `'${s.replace(/'/g, "''")}'`;
+	const commands = [`select vdisk file="${vhd}"`, 'attach vdisk readonly', 'compact vdisk', 'detach vdisk', 'exit'];
+	return (
+		`$commands = @(${commands.map(quote).join(', ')}); ` +
+		`$commands | & ${program} 2>&1 | Out-File -FilePath ${quote(log)} -Encoding utf8; ` +
+		'exit $LASTEXITCODE'
+	);
+}
+
+/** PowerShell expressions for the programs of the elevated chain, by absolute path. */
+const DISKPART = '"$env:SystemRoot\\System32\\diskpart.exe"';
+const ELEVATED_POWERSHELL = '"$env:SystemRoot\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"';
+
+/** -EncodedCommand takes the script as base64 of UTF-16LE. */
+export function encodePowerShell(script: string): string {
+	return Buffer.from(script, 'utf16le').toString('base64');
+}
+
+/**
  * Compacts a dynamic VHDX with diskpart, which needs administrator rights, so
  * Windows shows a UAC prompt. The disk must not be attached: stop the distro
- * first. An elevated process cannot have its output piped back to us, so cmd.exe
- * redirects diskpart's output to a log file that we read afterwards.
+ * first. An elevated process cannot have its output piped back to us, so it
+ * writes diskpart's output to a log file that we read afterwards.
  */
-export async function compactVhd(vhdWindowsPath: string): Promise<CompactResult> {
+export async function compactVhd(vhdWindowsPath: string, program = DISKPART, elevate = true): Promise<CompactResult> {
+	const vhd = await asciiPath(vhdWindowsPath);
 	const tempHost = await windowsTempDir();
 	const tempWindows = await toWindowsHostPath(tempHost);
-	const id = `wsl-distro-manager-${process.pid}-${Date.now()}`;
-	const scriptName = `${id}.txt`;
-	const logName = `${id}.log`;
-
-	const script = [
-		`select vdisk file="${vhdWindowsPath}"`,
-		'attach vdisk readonly',
-		'compact vdisk',
-		'detach vdisk',
-		'exit',
-		'',
-	].join('\r\n');
-	const scriptHost = path.join(tempHost, scriptName);
+	// Unpredictable, so no other program can prepare a file or link at that path
+	// for the elevated process to write through.
+	const logName = `wsl-distro-manager-${randomUUID()}.log`;
 	const logHost = path.join(tempHost, logName);
-	await fs.writeFile(scriptHost, script, 'utf8');
+	const logWindows = path.win32.join(tempWindows, logName);
+	const encoded = encodePowerShell(diskpartScript(vhd, logWindows, program));
 
 	try {
-		const scriptWindows = path.win32.join(tempWindows, scriptName);
-		const logWindows = path.win32.join(tempWindows, logName);
-		const quote = (s: string) => s.replace(/'/g, "''");
 		const command =
-			`$p = Start-Process -FilePath cmd.exe -Verb RunAs -Wait -PassThru -WindowStyle Hidden -ArgumentList '/c diskpart /s "${quote(scriptWindows)}" > "${quote(logWindows)}" 2>&1'; exit $p.ExitCode`;
+			`$p = Start-Process -FilePath ${ELEVATED_POWERSHELL} ${elevate ? '-Verb RunAs ' : ''}-Wait -PassThru -WindowStyle Hidden ` +
+			`-ArgumentList '-NoProfile','-NonInteractive','-EncodedCommand','${encoded}'; exit $p.ExitCode`;
 		const result = await spawnCapture(powershellPath(), ['-NoProfile', '-NonInteractive', '-Command', command], {
 			cwd: process.platform === 'win32' ? undefined : '/mnt/c',
 			tolerateFailure: true,
 		});
-		// diskpart writes in the OEM code page; latin1 keeps the messages readable enough.
-		const log = await fs.readFile(logHost).then((b) => b.toString('latin1'), () => undefined);
+		const log = await fs.readFile(logHost, 'utf8').then((text) => text.replace(/^\uFEFF/, ''), () => undefined);
 		if (log === undefined) {
 			// The elevated process never ran: the UAC prompt was declined or failed.
 			throw new Error(
@@ -595,15 +600,40 @@ export async function compactVhd(vhdWindowsPath: string): Promise<CompactResult>
 		}
 		return { code: result.code, log };
 	} finally {
-		await fs.rm(scriptHost, { force: true });
 		await fs.rm(logHost, { force: true });
 	}
 }
 
+/**
+ * diskpart reads its script in the legacy code page, so an accented path (for
+ * example under C:\Users\joão) would reach it garbled. Such paths are replaced
+ * by their 8.3 short form (C:\Users\JOO~1\...), which is plain ASCII.
+ */
+async function asciiPath(windowsPath: string): Promise<string> {
+	if (isAscii(windowsPath)) {
+		return windowsPath;
+	}
+	const quoted = windowsPath.replace(/'/g, "''");
+	const result = await spawnCapture(
+		powershellPath(),
+		['-NoProfile', '-NonInteractive', '-Command', `(New-Object -ComObject Scripting.FileSystemObject).GetFile('${quoted}').ShortPath`],
+		{ cwd: process.platform === 'win32' ? undefined : '/mnt/c', tolerateFailure: true },
+	);
+	const short = result.stdout.trim();
+	if (result.code !== 0 || !short || !isAscii(short)) {
+		throw new Error(
+			vscode.l10n.t('diskpart cannot open {0}: the path has non-ASCII characters and the drive has no short (8.3) names. Move the distro to a folder with a plain name first.', windowsPath),
+		);
+	}
+	return short;
+}
+
+export function isAscii(text: string): boolean {
+	return /^[\x00-\x7f]*$/.test(text);
+}
+
 function powershellPath(): string {
-	return process.platform === 'win32'
-		? 'powershell.exe'
-		: '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe';
+	return system32('WindowsPowerShell\\v1.0\\powershell.exe');
 }
 
 /** Inverse of toHostPath(): a path on this host as Windows sees it. */
@@ -611,7 +641,7 @@ async function toWindowsHostPath(hostPath: string): Promise<string> {
 	if (process.platform === 'win32') {
 		return hostPath;
 	}
-	return (await spawnCapture('wslpath', ['-w', hostPath])).stdout.trim();
+	return (await spawnCapture(WSLPATH, ['-w', hostPath])).stdout.trim();
 }
 
 /**
@@ -692,21 +722,61 @@ export function parseVscodeConnectedDistros(commandLines: string): string[] {
  */
 const INTEROP_REGISTRATION = ':WSLInterop:M::MZ::/init:P';
 
-/** Re-registers interop where it is missing. Returns the distros where it was restored. */
-export async function restoreInterop(distros: string[]): Promise<string[]> {
-	const script =
-		`ls /proc/sys/fs/binfmt_misc 2>/dev/null | grep -q '^WSLInterop' && exit 0; echo '${INTEROP_REGISTRATION}' > /proc/sys/fs/binfmt_misc/register && echo restored`;
-	const restored: string[] = [];
+/** Pure part of interopMissing(): `ls /proc/sys/fs/binfmt_misc` output. */
+export function interopMissingFromListing(listing: string): boolean {
+	const entries = listing.split(/\s+/).filter(Boolean);
+	// Only judge when binfmt_misc is mounted (it always has "register").
+	return entries.includes('register') && !entries.some((e) => e.startsWith('WSLInterop'));
+}
+
+/**
+ * The running distros that lost Windows interop. Runs as the default user:
+ * listing binfmt_misc needs no privileges.
+ */
+export async function interopMissing(distros: string[]): Promise<string[]> {
+	const missing: string[] = [];
 	for (const distro of distros) {
-		const result = await run(['--distribution', distro, '--user', 'root', '--exec', '/bin/sh', '-c', script], {
-			tolerateFailure: true,
-		});
-		if (result.stdout.includes('restored')) {
-			restored.push(distro);
+		const result = await runAsUser(distro, ['ls', '/proc/sys/fs/binfmt_misc']);
+		if (result.code === 0 && interopMissingFromListing(result.stdout)) {
+			missing.push(distro);
 		}
 	}
-	return restored;
+	return missing;
 }
+
+export type InteropRepair = 'repaired' | 'password-needed' | 'wrong-password' | 'no-sudo' | 'denied';
+
+/**
+ * Re-registers interop through the distro's own `sudo`, so its rules apply
+ * (who may use it, whether it needs a password, logging). Never `wsl -u root`,
+ * which would bypass them. A default user that is already root writes
+ * directly. Without a password, `sudo -n` succeeds only when the distro allows
+ * it without one; with a password, it goes to `sudo -S` on standard input,
+ * never on the command line, where other processes could read it.
+ */
+export async function repairInteropWithSudo(distro: string, password?: string): Promise<InteropRepair> {
+	const write = `echo '${INTEROP_REGISTRATION}' > /proc/sys/fs/binfmt_misc/register`;
+	const script =
+		'if [ "$(id -u)" = 0 ]; then sh -c "$1"; exit $?; fi; ' +
+		'command -v sudo >/dev/null 2>&1 || exit 127; ' +
+		(password === undefined ? 'sudo -n sh -c "$1"' : 'sudo -S -p "" sh -c "$1"');
+	const result = await runAsUser(distro, ['sh', '-c', script, 'sh', write], {
+		stdin: password === undefined ? undefined : Buffer.from(`${password}\n`, 'utf8'),
+	});
+	if (result.code === 0) {
+		return 'repaired';
+	}
+	if (result.code === 127) {
+		return 'no-sudo';
+	}
+	if (/not in the sudoers|not allowed to/i.test(result.stderr)) {
+		return 'denied';
+	}
+	return password === undefined ? 'password-needed' : 'wrong-password';
+}
+
+/** The command a user can run inside a distro to repair interop by hand. */
+export const INTEROP_REPAIR_COMMAND = `sudo sh -c "echo ${INTEROP_REGISTRATION} > /proc/sys/fs/binfmt_misc/register"`;
 
 let cachedDesktop: string | undefined;
 
@@ -753,13 +823,16 @@ export interface HomeEntry {
 	isDir: boolean;
 }
 
-/** Entries of the default user's home folder, dotfiles included. */
-export async function listHome(distro: string): Promise<HomeEntry[]> {
-	const result = await runAsUser(distro, ['ls', '-1Ap']);
+/**
+ * Entries of a folder of the default user, dotfiles included. `folder` is
+ * relative to the home folder ('' or '.' for home itself).
+ */
+export async function listFolder(distro: string, folder = ''): Promise<HomeEntry[]> {
+	const result = await runAsUser(distro, ['ls', '-1Ap', '--', folder || '.']);
 	return parseHomeListing(result.stdout);
 }
 
-/** Pure part of listHome(): `ls -1Ap` marks folders with a trailing slash. */
+/** Pure part of listFolder(): `ls -1Ap` marks folders with a trailing slash. */
 export function parseHomeListing(stdout: string): HomeEntry[] {
 	return stdout
 		.split(/\r?\n/)
@@ -799,4 +872,66 @@ export async function existingNames(distro: string, folder: string, names: strin
 	const script = 'd=$1; shift; for n in "$@"; do [ -e "$d/$n" ] && printf "%s\\n" "$n"; done; exit 0';
 	const result = await runAsUser(distro, ['sh', '-c', script, 'sh', folder, ...names]);
 	return result.stdout.split(/\r?\n/).filter(Boolean);
+}
+
+export interface WslVersion {
+	wsl: string;
+	kernel?: string;
+}
+
+/**
+ * `wsl --version` labels are localized ("Versão do WSL: 2.7.14.0"), but the
+ * order is fixed: WSL first, kernel second. Read values by position. Old inbox
+ * WSL has no --version and prints usage instead: no ": <digit>" lines.
+ */
+export function parseWslVersion(stdout: string): WslVersion | undefined {
+	const values = stdout
+		.split(/\r?\n/)
+		.map((line) => /:\s*(\d[\w.+-]*)\s*$/.exec(line.replace(/\0/g, ''))?.[1])
+		.filter((v): v is string => v !== undefined);
+	return values.length > 0 ? { wsl: values[0], kernel: values[1] } : undefined;
+}
+
+let cachedWslVersion: Promise<WslVersion | undefined> | undefined;
+
+/** Cached for the session: it only changes with `wsl --update`. */
+export function wslVersion(refresh = false): Promise<WslVersion | undefined> {
+	if (refresh || !cachedWslVersion) {
+		cachedWslVersion = run(['--version'], { tolerateFailure: true }).then(
+			(r) => (r.code === 0 ? parseWslVersion(r.stdout) : undefined),
+			() => undefined,
+		);
+	}
+	return cachedWslVersion;
+}
+
+/**
+ * Where the global .wslconfig is and whether it exists. Its contents are never
+ * read here: the view only opens the file.
+ */
+export async function wslConfigFile(): Promise<{ path: string; exists: boolean }> {
+	const file = path.join(await windowsHomeDir(), '.wslconfig');
+	const exists = await fs.access(file).then(() => true, () => false);
+	return { path: file, exists };
+}
+
+/** Seconds since the WSL VM booted, read in a running distro (from /proc/uptime). */
+export async function vmUptime(distro: string): Promise<number | undefined> {
+	const result = await run(['--distribution', distro, '--exec', 'cat', '/proc/uptime'], { tolerateFailure: true });
+	return parseUptime(result.stdout);
+}
+
+export function parseUptime(stdout: string): number | undefined {
+	const seconds = Number(stdout.trim().split(/\s+/)[0]);
+	return stdout.trim() && Number.isFinite(seconds) ? seconds : undefined;
+}
+
+/**
+ * The distros to start again after WSL shuts down: exactly those that were
+ * running, never stopped ones, and not those of Docker, Podman, or Rancher
+ * Desktop, which their tools must start (a plain `wsl -d` does not bring
+ * their services up).
+ */
+export function distrosToStartAgain(distros: Distro[]): string[] {
+	return distros.filter((d) => d.running && !managedBy(d.name)).map((d) => d.name);
 }

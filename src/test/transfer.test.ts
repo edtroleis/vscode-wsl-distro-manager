@@ -1,6 +1,20 @@
 import assert = require('node:assert/strict');
 import { describe, it } from 'node:test';
-import { backupCommand, backupFileName, backupOutcome, extractCommand, isArchive, parseExcludes } from '../transfer';
+import {
+	backupCommand,
+	backupFileName,
+	backupOutcome,
+	childPath,
+	extractCommand,
+	isArchive,
+	isCloudSynced,
+	isWithin,
+	normalizeSelection,
+	parseExcludes,
+	parseTypedPaths,
+	sensitivePaths,
+	updateSelection,
+} from '../transfer';
 import { parseFolderAccess, parseHomeListing } from '../wsl';
 
 describe('backupFileName', () => {
@@ -86,5 +100,92 @@ describe('parseFolderAccess', () => {
 
 	it('denies when the distro gave no answer', () => {
 		assert.deepEqual(parseFolderAccess('', '/x'), { state: 'denied', path: '/x' });
+	});
+});
+
+describe('sensitivePaths', () => {
+	it('flags folders that usually hold credentials, also nested or absolute', () => {
+		assert.deepEqual(sensitivePaths(['code', '.ssh', 'projects/app/.aws', '/root/.kube/config', '.config/gcloud', 'notes.txt']), [
+			'.ssh',
+			'projects/app/.aws',
+			'/root/.kube/config',
+			'.config/gcloud',
+		]);
+	});
+
+	it('does not flag look-alikes', () => {
+		assert.deepEqual(sensitivePaths(['ssh-notes', '.sshrc-backup', 'aws-scripts', '.config']), []);
+	});
+});
+
+describe('isCloudSynced', () => {
+	it('recognizes folders that cloud clients upload', () => {
+		assert.equal(isCloudSynced('C:\\Users\\u\\OneDrive\\Área de Trabalho'), true);
+		assert.equal(isCloudSynced('C:\\Users\\u\\OneDrive - Contoso\\Desktop'), true);
+		assert.equal(isCloudSynced('C:\\Users\\u\\Dropbox'), true);
+	});
+
+	it('does not flag local folders', () => {
+		assert.equal(isCloudSynced('C:\\Users\\u\\Desktop'), false);
+		assert.equal(isCloudSynced('D:\\Backups\\OneDriveOld'), false);
+	});
+});
+
+describe('folder selection', () => {
+	// The view of ~/code: the folder itself ("Everything in code/") and its entries.
+	const view = ['code', 'code/app', 'code/lib', 'code/notes.md'];
+
+	it('builds paths relative to home', () => {
+		assert.equal(childPath('.', 'code'), 'code');
+		assert.equal(childPath('code', 'app'), 'code/app');
+	});
+
+	it('knows what a folder contains', () => {
+		assert.equal(isWithin('code/app', 'code'), true);
+		assert.equal(isWithin('code', 'code'), true);
+		assert.equal(isWithin('codes', 'code'), false);
+		assert.equal(isWithin('anything', '.'), true);
+	});
+
+	it('drops paths already covered by a chosen folder', () => {
+		assert.deepEqual(normalizeSelection(['code', 'code/app', 'docs', 'docs']), ['code', 'docs']);
+		assert.deepEqual(normalizeSelection(['.', 'code']), ['.']);
+	});
+
+	it('takes the whole folder when "Everything" is checked, replacing items chosen inside', () => {
+		const before = ['docs', 'code/app', 'code/lib/src'];
+		assert.deepEqual(updateSelection(before, 'code', view, ['code/app'], ['code/app', 'code']), ['docs', 'code']);
+	});
+
+	it('takes only the chosen items inside a folder', () => {
+		assert.deepEqual(updateSelection(['docs'], 'code', view, [], ['code/app', 'code/notes.md']), ['docs', 'code/app', 'code/notes.md']);
+	});
+
+	it('switches from "Everything" to items when an item is checked', () => {
+		assert.deepEqual(updateSelection(['code'], 'code', view, ['code'], ['code', 'code/lib']), ['code/lib']);
+	});
+
+	it('keeps choices made deeper in the folder when entries change', () => {
+		assert.deepEqual(updateSelection(['code/app/src'], 'code', view, [], ['code/notes.md']), ['code/app/src', 'code/notes.md']);
+	});
+
+	it('removes what is unchecked', () => {
+		assert.deepEqual(updateSelection(['code/app', 'code/lib'], 'code', view, ['code/app', 'code/lib'], ['code/lib']), ['code/lib']);
+	});
+});
+
+describe('sensitivePaths with the whole home folder', () => {
+	it('names the credential folders the home folder would take along', () => {
+		assert.deepEqual(sensitivePaths(['.'], ['.bashrc', '.ssh', 'code', '.aws']), ['~/.ssh', '~/.aws']);
+	});
+
+	it('says nothing when the home folder has none', () => {
+		assert.deepEqual(sensitivePaths(['.'], ['.bashrc', 'code']), []);
+	});
+});
+
+describe('parseTypedPaths', () => {
+	it('turns ~ into paths relative to home, since no shell expands it', () => {
+		assert.deepEqual(parseTypedPaths(' ~/.ssh, projects/app ,/etc/nginx, ~ ,'), ['.ssh', 'projects/app', '/etc/nginx', '.']);
 	});
 });

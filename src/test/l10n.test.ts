@@ -34,7 +34,8 @@ for (const [source, translation] of [
 
 		it('leaves no string untranslated by accident', () => {
 			// Same text is fine for names and short technical words (CPU, VHDX, WSL {0}, root (uid 0)).
-			const same = Object.keys(en).filter((k) => pt[k] === en[k] && k.split(' ').length > 3);
+			const words = (text: string) => text.replace(/\{\d+\}/g, '').match(/[A-Za-z]{2,}/g) ?? [];
+			const same = Object.keys(en).filter((k) => pt[k] === en[k] && words(k).length > 3);
 			assert.deepEqual(same, []);
 		});
 	});
