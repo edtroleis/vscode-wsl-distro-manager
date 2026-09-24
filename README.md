@@ -104,6 +104,15 @@ applies it: restarting the distro or running `wsl --shutdown`.
 | `wslManager.wslExePath` | `""` | Path to `wsl.exe`. Empty = auto-detect. |
 | `wslManager.confirmDestructiveActions` | `true` | Confirm before terminate/shutdown/unregister. |
 
+## Languages
+
+English and Brazilian Portuguese. The extension follows VS Code's display
+language (`Configure Display Language`; Portuguese needs the *Portuguese
+(Brazil) Language Pack*). UI strings live in [`l10n/`](l10n/) and
+[`package.nls.pt-br.json`](package.nls.pt-br.json); `npm run l10n` re-extracts
+the English strings from the source, and CI fails if they are out of date. A unit
+test checks that every string has a translation with the same placeholders.
+
 ## Requirements
 
 Windows 10/11 with WSL installed. The extension also works from a VS Code

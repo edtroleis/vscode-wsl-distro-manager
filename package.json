@@ -1,7 +1,7 @@
 {
   "name": "wsl-distro-manager",
   "displayName": "WSL Distro Manager",
-  "description": "Manage WSL distros from the sidebar: start/stop, live CPU and memory, default distro, export/import, shutdown, and editing of .wslconfig and /etc/wsl.conf.",
+  "description": "%description%",
   "version": "0.1.0",
   "publisher": "edtroleis",
   "license": "MIT",
@@ -34,6 +34,7 @@
     "workspace"
   ],
   "main": "./out/extension.js",
+  "l10n": "./l10n",
   "activationEvents": [],
   "contributes": {
     "viewsContainers": {
@@ -57,7 +58,7 @@
     "viewsWelcome": [
       {
         "view": "wslManager.distros",
-        "contents": "No WSL distros found.\n[Install Distro](command:wslManager.install)\n[Import Distro](command:wslManager.import)\n[Refresh](command:wslManager.refresh)"
+        "contents": "%welcome%"
       }
     ],
     "languages": [
@@ -72,113 +73,113 @@
     "commands": [
       {
         "command": "wslManager.refresh",
-        "title": "Refresh",
+        "title": "%command.refresh%",
         "category": "WSL Distro Manager",
         "icon": "$(refresh)"
       },
       {
         "command": "wslManager.shutdown",
-        "title": "Shut Down WSL (wsl --shutdown)",
+        "title": "%command.shutdown%",
         "category": "WSL Distro Manager",
         "icon": "$(debug-stop)"
       },
       {
         "command": "wslManager.repairInterop",
-        "title": "Repair Windows Interop",
+        "title": "%command.repairInterop%",
         "category": "WSL Distro Manager"
       },
       {
         "command": "wslManager.editWslConfig",
-        "title": "Edit .wslconfig (Global)",
+        "title": "%command.editWslConfig%",
         "category": "WSL Distro Manager",
         "icon": "$(settings-gear)"
       },
       {
         "command": "wslManager.install",
-        "title": "Install Distro...",
+        "title": "%command.install%",
         "category": "WSL Distro Manager",
         "icon": "$(add)"
       },
       {
         "command": "wslManager.import",
-        "title": "Import Distro...",
+        "title": "%command.import%",
         "category": "WSL Distro Manager",
         "icon": "$(cloud-download)"
       },
       {
         "command": "wslManager.openWindow",
-        "title": "Open in New VS Code Window",
+        "title": "%command.openWindow%",
         "category": "WSL Distro Manager",
         "icon": "$(empty-window)"
       },
       {
         "command": "wslManager.openTerminal",
-        "title": "Open Terminal",
+        "title": "%command.openTerminal%",
         "category": "WSL Distro Manager",
         "icon": "$(terminal)"
       },
       {
         "command": "wslManager.start",
-        "title": "Start",
+        "title": "%command.start%",
         "category": "WSL Distro Manager",
         "icon": "$(play)"
       },
       {
         "command": "wslManager.terminate",
-        "title": "Stop (Terminate)",
+        "title": "%command.terminate%",
         "category": "WSL Distro Manager",
         "icon": "$(stop-circle)"
       },
       {
         "command": "wslManager.restart",
-        "title": "Restart",
+        "title": "%command.restart%",
         "category": "WSL Distro Manager",
         "icon": "$(debug-restart)"
       },
       {
         "command": "wslManager.setDefault",
-        "title": "Set as Default Distro",
+        "title": "%command.setDefault%",
         "category": "WSL Distro Manager",
         "icon": "$(star-full)"
       },
       {
         "command": "wslManager.editWslConf",
-        "title": "Edit /etc/wsl.conf",
+        "title": "%command.editWslConf%",
         "category": "WSL Distro Manager",
         "icon": "$(settings)"
       },
       {
         "command": "wslManager.export",
-        "title": "Export (Backup)...",
+        "title": "%command.export%",
         "category": "WSL Distro Manager",
         "icon": "$(cloud-upload)"
       },
       {
         "command": "wslManager.compact",
-        "title": "Compact Disk...",
+        "title": "%command.compact%",
         "category": "WSL Distro Manager",
         "icon": "$(fold)"
       },
       {
         "command": "wslManager.move",
-        "title": "Move to Another Folder...",
+        "title": "%command.move%",
         "category": "WSL Distro Manager",
         "icon": "$(folder-opened)"
       },
       {
         "command": "wslManager.setVersion",
-        "title": "Convert to WSL 1 / WSL 2...",
+        "title": "%command.setVersion%",
         "category": "WSL Distro Manager"
       },
       {
         "command": "wslManager.unregister",
-        "title": "Unregister Distro...",
+        "title": "%command.unregister%",
         "category": "WSL Distro Manager",
         "icon": "$(trash)"
       },
       {
         "command": "wslManager.copyName",
-        "title": "Copy Name",
+        "title": "%command.copyName%",
         "category": "WSL Distro Manager"
       }
     ],
@@ -314,24 +315,24 @@
         "wslManager.wslExePath": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Path to `wsl.exe`. Empty = auto-detect (`wsl.exe` on Windows, `/mnt/c/Windows/System32/wsl.exe` when the window is connected to WSL)."
+          "markdownDescription": "%config.wslExePath%"
         },
         "wslManager.autoRefreshSeconds": {
           "type": "number",
           "default": 10,
           "minimum": 0,
-          "markdownDescription": "Interval, in seconds, for automatically refreshing the list while the view is visible. `0` disables it."
+          "markdownDescription": "%config.autoRefreshSeconds%"
         },
         "wslManager.metricsIntervalSeconds": {
           "type": "number",
           "default": 2,
           "minimum": 1,
-          "markdownDescription": "Sampling interval, in seconds, for the CPU and memory of an expanded distro. Sampling only runs while the distro is already running, expanded, and the view is visible."
+          "markdownDescription": "%config.metricsIntervalSeconds%"
         },
         "wslManager.defaultUser": {
           "type": "string",
           "default": "",
-          "description": "User for terminals opened in a distro. Empty = the distro's default user."
+          "description": "%config.defaultUser%"
         },
         "wslManager.clickAction": {
           "type": "string",
@@ -342,23 +343,23 @@
             "none"
           ],
           "enumDescriptions": [
-            "Expands the distro to show its details and configuration files.",
-            "Opens a terminal in the distro (expand it with the arrow).",
-            "Opens a new VS Code window connected to the distro (expand it with the arrow).",
-            "Does nothing; use the buttons and the context menu."
+            "%config.clickAction.expand%",
+            "%config.clickAction.terminal%",
+            "%config.clickAction.window%",
+            "%config.clickAction.none%"
           ],
           "default": "expand",
-          "description": "What clicking a distro in the list does."
+          "description": "%config.clickAction%"
         },
         "wslManager.showManagedDistros": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Show distros created by Docker Desktop, Podman, and Rancher Desktop (`docker-desktop`, `podman-*`, ...). They are labeled and protected by extra warnings either way."
+          "markdownDescription": "%config.showManagedDistros%"
         },
         "wslManager.confirmDestructiveActions": {
           "type": "boolean",
           "default": true,
-          "description": "Ask for confirmation before terminate, shutdown, and unregister."
+          "description": "%config.confirmDestructiveActions%"
         }
       }
     }
@@ -371,11 +372,13 @@
     "publish": "vsce publish",
     "test": "npm run compile && node --require ./out/test/setup.js --test \"out/test/**/*.test.js\"",
     "smoke": "npm run compile && node --require ./out/test/setup.js out/test/smoke.js",
-    "smoke:windows": "npm run compile && bash scripts/smoke-windows.sh"
+    "smoke:windows": "npm run compile && bash scripts/smoke-windows.sh",
+    "l10n": "l10n-dev export --outDir ./l10n ./src"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
+    "@vscode/l10n-dev": "^0.0.35",
     "@vscode/vsce": "^3.9.2",
     "typescript": "^5.4.0"
   }

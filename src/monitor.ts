@@ -87,7 +87,7 @@ export class MetricItem extends vscode.TreeItem {
 		this.id = id;
 		this.iconPath = new vscode.ThemeIcon(icon);
 		this.contextValue = 'wslMetric';
-		this.description = 'waiting...';
+		this.description = vscode.l10n.t('waiting...');
 	}
 }
 
@@ -141,9 +141,9 @@ export class DistroMonitor implements vscode.Disposable {
 		private readonly options: MonitorOptions = {},
 	) {
 		const base = `distro/${distro}/metric`;
-		this.cpu = new MetricItem(`${base}/cpu`, 'CPU', 'pulse');
-		this.memory = new MetricItem(`${base}/memory`, 'Memory', 'server');
-		this.processes = new MetricItem(`${base}/procs`, 'Processes', 'list-tree');
+		this.cpu = new MetricItem(`${base}/cpu`, vscode.l10n.t('CPU'), 'pulse');
+		this.memory = new MetricItem(`${base}/memory`, vscode.l10n.t('Memory'), 'server');
+		this.processes = new MetricItem(`${base}/procs`, vscode.l10n.t('Processes'), 'list-tree');
 	}
 
 	get items(): MetricItem[] {
@@ -194,7 +194,7 @@ export class DistroMonitor implements vscode.Disposable {
 			return;
 		}
 		this.generation++;
-		this.stopSampling('paused');
+		this.stopSampling(vscode.l10n.t('paused'));
 	}
 
 	dispose(): void {
@@ -248,7 +248,7 @@ export class DistroMonitor implements vscode.Disposable {
 				}
 				await fs.rm(paths.lock, { force: true });
 				if (generation === this.generation) {
-					this.markStopped('stopped');
+					this.markStopped(vscode.l10n.t('stopped'));
 				}
 			}
 		};
@@ -305,11 +305,11 @@ export class DistroMonitor implements vscode.Disposable {
 		) : Promise.resolve());
 		child.on('error', () => {
 			void release();
-			this.finish(child, 'unavailable');
+			this.finish(child, vscode.l10n.t('unavailable'));
 		});
 		child.on('close', () => {
 			void release();
-			this.finish(child, 'stopped');
+			this.finish(child, vscode.l10n.t('stopped'));
 		});
 	}
 
@@ -349,9 +349,7 @@ export class DistroMonitor implements vscode.Disposable {
 		const memUsedVm = sample.memTotal - sample.memAvail;
 		this.memory.description = `${bar(sample.rssBytes / sample.memTotal)} ${formatBytes(sample.rssBytes)}`;
 		this.memory.tooltip =
-			`Distro: ${formatBytes(sample.rssBytes)} (sum of process RSS; shared pages are counted more than once)\n` +
-			`WSL VM: ${formatBytes(memUsedVm)} used of ${formatBytes(sample.memTotal)} ` +
-			`(${((memUsedVm / sample.memTotal) * 100).toFixed(0)}%)`;
+			vscode.l10n.t('Distro: {0} (sum of process RSS; shared pages are counted more than once)\nWSL VM: {1} used of {2} ({3}%)', formatBytes(sample.rssBytes), formatBytes(memUsedVm), formatBytes(sample.memTotal), ((memUsedVm / sample.memTotal) * 100).toFixed(0));
 		this.processes.description = String(sample.procs);
 
 		const prev = this.previous;
@@ -364,8 +362,7 @@ export class DistroMonitor implements vscode.Disposable {
 				const vm = 1 - Math.max(0, sample.cpuIdle - prev.cpuIdle) / total;
 				this.cpu.description = `${bar(distro)} ${(distro * 100).toFixed(1)}%`;
 				this.cpu.tooltip =
-					`Distro: ${(distro * 100).toFixed(1)}% of the VM (${(distro * sample.ncpu * 100).toFixed(0)}% of one core)\n` +
-					`WSL VM: ${(vm * 100).toFixed(1)}% of ${sample.ncpu} cores`;
+					vscode.l10n.t('Distro: {0}% of the VM ({1}% of one core)\nWSL VM: {2}% of {3} cores', (distro * 100).toFixed(1), (distro * sample.ncpu * 100).toFixed(0), (vm * 100).toFixed(1), sample.ncpu);
 			}
 		}
 		this.onUpdate(this.items);

@@ -21,7 +21,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	context.subscriptions.push(
 		tree.onDidLoad((distros) => {
 			const running = distros.filter((d) => d.running).length;
-			view.badge = running > 0 ? { value: running, tooltip: `${running} running` } : undefined;
+			view.badge = running > 0 ? { value: running, tooltip: vscode.l10n.t('{0} running', running) } : undefined;
 		}),
 	);
 
@@ -42,12 +42,12 @@ async function onConfigSaved(document: vscode.TextDocument): Promise<void> {
 
 	if (distro) {
 		const choice = await vscode.window.showInformationMessage(
-			`${describe(document.uri)} saved. Restart "${distro}" to apply it?`,
-			'Restart Distro',
+			vscode.l10n.t('{0} saved. Restart "{1}" to apply it?', describe(document.uri), distro),
+			vscode.l10n.t('Restart Distro'),
 		);
 		if (choice && (await confirmRestartIfCurrentWindow(distro))) {
 			await vscode.window.withProgress(
-				{ location: vscode.ProgressLocation.Notification, title: `Restarting ${distro}...` },
+				{ location: vscode.ProgressLocation.Notification, title: vscode.l10n.t('Restarting {0}...', distro) },
 				async () => {
 					await wsl.terminate(distro);
 					await wsl.start(distro);
@@ -59,8 +59,8 @@ async function onConfigSaved(document: vscode.TextDocument): Promise<void> {
 	}
 
 	const choice = await vscode.window.showInformationMessage(
-		'.wslconfig saved. Run "wsl --shutdown" to apply it?',
-		'Shut Down WSL',
+		vscode.l10n.t('.wslconfig saved. Run "wsl --shutdown" to apply it?'),
+		vscode.l10n.t('Shut Down WSL'),
 	);
 	if (choice) {
 		await vscode.commands.executeCommand('wslManager.shutdown');

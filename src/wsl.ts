@@ -67,11 +67,11 @@ export interface RunResult {
 	code: number;
 }
 
-export const INTEROP_BROKEN_MESSAGE =
-	'Windows interop is disabled in this distro, so it cannot run wsl.exe. This is a known WSL issue: ' +
-	'when a distro stops, interop is unregistered in every other running distro. Run "Repair Windows ' +
-	'Interop" from a local VS Code window, or restore it here with: ' +
-	'sudo sh -c "echo :WSLInterop:M::MZ::/init:P > /proc/sys/fs/binfmt_misc/register"';
+export const interopBrokenMessage = () =>
+	vscode.l10n.t(
+		'Windows interop is disabled in this distro, so it cannot run wsl.exe. This is a known WSL issue: when a distro stops, interop is unregistered in every other running distro. Run "Repair Windows Interop" from a local VS Code window, or restore it here with: {0}',
+		'sudo sh -c "echo :WSLInterop:M::MZ::/init:P > /proc/sys/fs/binfmt_misc/register"',
+	);
 
 /**
  * On the Linux host, Windows programs run through a binfmt_misc entry that WSL
@@ -140,12 +140,12 @@ function spawnCapture(
 				code: code ?? -1,
 			};
 			if (result.code !== 0 && command.toLowerCase().endsWith('.exe') && interopBroken()) {
-				reject(new Error(INTEROP_BROKEN_MESSAGE));
+				reject(new Error(interopBrokenMessage()));
 			} else if (result.code === 0 || opts.tolerateFailure) {
 				resolve(result);
 			} else {
 				const message = (result.stderr || result.stdout).trim();
-				reject(new Error(message || `${command} exited with code ${result.code}`));
+				reject(new Error(message || vscode.l10n.t('{0} exited with code {1}', command, result.code)));
 			}
 		});
 		// Processes that never read stdin (wslpath, reg.exe) may close it before we
@@ -197,7 +197,7 @@ async function windowsDir(variable: 'USERPROFILE' | 'TEMP'): Promise<string> {
 	});
 	const windowsPath = echoed.stdout.trim();
 	if (!windowsPath || windowsPath.includes(`%${variable}%`)) {
-		throw new Error(`Could not determine the Windows %${variable}%.`);
+		throw new Error(vscode.l10n.t('Could not determine the Windows %{0}%.', variable));
 	}
 	const translated = (await spawnCapture('wslpath', ['-u', windowsPath])).stdout.trim();
 	windowsDirs.set(variable, translated);
@@ -480,7 +480,7 @@ export async function toWindowsPath(uri: vscode.Uri): Promise<string> {
 	if (uri.scheme === 'vscode-remote' && remote) {
 		return linuxToWindowsPath(decodeURIComponent(remote[1]), uri.path);
 	}
-	throw new Error(`Unsupported location: ${uri.toString(true)}`);
+	throw new Error(vscode.l10n.t('Unsupported location: {0}', uri.toString(true)));
 }
 
 /** Same mapping as `wslpath -w`, for a Linux path inside `distro`. */
@@ -532,15 +532,15 @@ export function isCurrentWindowDistro(name: string): boolean {
  * unregistering them from here breaks that tool, so the UI labels them and
  * warns before touching them.
  */
-const MANAGED_DISTROS: { pattern: RegExp; tool: string; hint: string }[] = [
-	{ pattern: /^docker-desktop(-data)?$/i, tool: 'Docker Desktop', hint: 'Use Docker Desktop to stop or reset it.' },
-	{ pattern: /^podman-/i, tool: 'Podman', hint: 'Use `podman machine stop` / `podman machine rm` instead.' },
-	{ pattern: /^rancher-desktop(-data)?$/i, tool: 'Rancher Desktop', hint: 'Use Rancher Desktop to stop or reset it.' },
+const MANAGED_DISTROS: { pattern: RegExp; tool: string; hint: () => string }[] = [
+	{ pattern: /^docker-desktop(-data)?$/i, tool: 'Docker Desktop', hint: () => vscode.l10n.t('Use Docker Desktop to stop or reset it.') },
+	{ pattern: /^podman-/i, tool: 'Podman', hint: () => vscode.l10n.t('Use `podman machine stop` / `podman machine rm` instead.') },
+	{ pattern: /^rancher-desktop(-data)?$/i, tool: 'Rancher Desktop', hint: () => vscode.l10n.t('Use Rancher Desktop to stop or reset it.') },
 ];
 
 export function managedBy(name: string): { tool: string; hint: string } | undefined {
 	const match = MANAGED_DISTROS.find((m) => m.pattern.test(name));
-	return match && { tool: match.tool, hint: match.hint };
+	return match && { tool: match.tool, hint: match.hint() };
 }
 
 export interface CompactResult {
@@ -580,9 +580,7 @@ export async function compactVhd(vhdWindowsPath: string): Promise<CompactResult>
 		const logWindows = path.win32.join(tempWindows, logName);
 		const quote = (s: string) => s.replace(/'/g, "''");
 		const command =
-			`$p = Start-Process -FilePath cmd.exe -Verb RunAs -Wait -PassThru -WindowStyle Hidden ` +
-			`-ArgumentList '/c diskpart /s "${quote(scriptWindows)}" > "${quote(logWindows)}" 2>&1'; ` +
-			'exit $p.ExitCode';
+			`$p = Start-Process -FilePath cmd.exe -Verb RunAs -Wait -PassThru -WindowStyle Hidden -ArgumentList '/c diskpart /s "${quote(scriptWindows)}" > "${quote(logWindows)}" 2>&1'; exit $p.ExitCode`;
 		const result = await spawnCapture(powershellPath(), ['-NoProfile', '-NonInteractive', '-Command', command], {
 			cwd: process.platform === 'win32' ? undefined : '/mnt/c',
 			tolerateFailure: true,
@@ -592,7 +590,7 @@ export async function compactVhd(vhdWindowsPath: string): Promise<CompactResult>
 		if (log === undefined) {
 			// The elevated process never ran: the UAC prompt was declined or failed.
 			throw new Error(
-				(result.stderr || result.stdout).trim() || 'Administrator permission was not granted.',
+				(result.stderr || result.stdout).trim() || vscode.l10n.t('Administrator permission was not granted.'),
 			);
 		}
 		return { code: result.code, log };
@@ -697,8 +695,7 @@ const INTEROP_REGISTRATION = ':WSLInterop:M::MZ::/init:P';
 /** Re-registers interop where it is missing. Returns the distros where it was restored. */
 export async function restoreInterop(distros: string[]): Promise<string[]> {
 	const script =
-		"ls /proc/sys/fs/binfmt_misc 2>/dev/null | grep -q '^WSLInterop' && exit 0; " +
-		`echo '${INTEROP_REGISTRATION}' > /proc/sys/fs/binfmt_misc/register && echo restored`;
+		`ls /proc/sys/fs/binfmt_misc 2>/dev/null | grep -q '^WSLInterop' && exit 0; echo '${INTEROP_REGISTRATION}' > /proc/sys/fs/binfmt_misc/register && echo restored`;
 	const restored: string[] = [];
 	for (const distro of distros) {
 		const result = await run(['--distribution', distro, '--user', 'root', '--exec', '/bin/sh', '-c', script], {

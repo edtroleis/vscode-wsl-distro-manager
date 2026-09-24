@@ -36,15 +36,15 @@ export class DistroItem extends vscode.TreeItem {
 		const managed = managedBy(distro.name);
 		this.contextValue = `wslDistro.${distro.running ? 'running' : 'stopped'}${managed ? '.managed' : ''}`;
 
-		const badges = [`WSL ${distro.version}`, distro.running ? 'Running' : 'Stopped'];
+		const badges = [`WSL ${distro.version}`, distro.running ? vscode.l10n.t('Running') : vscode.l10n.t('Stopped')];
 		if (managed) {
 			badges.unshift(managed.tool);
 		}
 		if (distro.isDefault) {
-			badges.unshift('default');
+			badges.unshift(vscode.l10n.t('default'));
 		}
 		if (isCurrentWindowDistro(distro.name)) {
-			badges.unshift('this window');
+			badges.unshift(vscode.l10n.t('this window'));
 		}
 		this.description = badges.join(' · ');
 
@@ -55,11 +55,11 @@ export class DistroItem extends vscode.TreeItem {
 
 		const tooltip = new vscode.MarkdownString();
 		tooltip.appendMarkdown(`**${distro.name}**\n\n`);
-		tooltip.appendMarkdown(`- State: ${distro.running ? 'Running' : 'Stopped'}\n`);
-		tooltip.appendMarkdown(`- Version: WSL ${distro.version}\n`);
-		tooltip.appendMarkdown(`- Default: ${distro.isDefault ? 'yes' : 'no'}\n`);
+		tooltip.appendMarkdown(vscode.l10n.t('- State: {0}\n', distro.running ? 'Running' : 'Stopped'));
+		tooltip.appendMarkdown(vscode.l10n.t('- Version: WSL {0}\n', distro.version));
+		tooltip.appendMarkdown(vscode.l10n.t('- Default: {0}\n', distro.isDefault ? 'yes' : 'no'));
 		if (managed) {
-			tooltip.appendMarkdown(`\nManaged by **${managed.tool}**. ${managed.hint}\n`);
+			tooltip.appendMarkdown(vscode.l10n.t('\nManaged by **{0}**. {1}\n', managed.tool, managed.hint));
 		}
 		this.tooltip = tooltip;
 
@@ -69,13 +69,13 @@ export class DistroItem extends vscode.TreeItem {
 		if (clickAction === 'terminal') {
 			this.command = {
 				command: 'wslManager.openTerminal',
-				title: 'Open Terminal',
+				title: vscode.l10n.t('Open Terminal'),
 				arguments: [this],
 			};
 		} else if (clickAction === 'window') {
 			this.command = {
 				command: 'wslManager.openWindow',
-				title: 'Open in New Window',
+				title: vscode.l10n.t('Open in New Window'),
 				arguments: [this],
 			};
 		}
@@ -107,7 +107,7 @@ class ConfigFileItem extends vscode.TreeItem {
 		this.description = description;
 		this.iconPath = new vscode.ThemeIcon('gear');
 		this.contextValue = 'wslConfigFile';
-		this.command = { command, title: `Edit ${label}`, arguments: [parent] };
+		this.command = { command, title: vscode.l10n.t('Edit {0}', label), arguments: [parent] };
 	}
 }
 
@@ -118,14 +118,18 @@ class ConfigFileItem extends vscode.TreeItem {
  */
 export function vhdxItem(parent: DistroItem, vhdWindows: string, size: number, used: number | undefined): InfoItem {
 	const reclaimable = estimateReclaimable(size, used);
-	const value = reclaimable !== undefined ? `${formatBytes(size)} · ~${formatBytes(reclaimable)} reclaimable` : formatBytes(size);
-	const tooltip =
-		`${vhdWindows}\n\nFile size: ${formatBytes(size)}` +
-		(used === undefined
-			? '\nStart the distro to estimate reclaimable space.'
-			: `\nUsed inside the distro: ${formatBytes(used)}` +
-				(reclaimable === undefined ? '\nLittle to reclaim: compacting is not worth it now.' : ''));
-	const item = new InfoItem(parent, 'VHDX', value, reclaimable !== undefined ? 'warning' : 'file-binary', tooltip);
+	const value = reclaimable !== undefined ? vscode.l10n.t('{0} · ~{1} reclaimable', formatBytes(size), formatBytes(reclaimable)) : formatBytes(size);
+	const lines = [vhdWindows, '', vscode.l10n.t('File size: {0}', formatBytes(size))];
+	if (used === undefined) {
+		lines.push(vscode.l10n.t('Start the distro to estimate reclaimable space.'));
+	} else {
+		lines.push(vscode.l10n.t('Used inside the distro: {0}', formatBytes(used)));
+		if (reclaimable === undefined) {
+			lines.push(vscode.l10n.t('Little to reclaim: compacting is not worth it now.'));
+		}
+	}
+	const tooltip = lines.join('\n');
+	const item = new InfoItem(parent, vscode.l10n.t('VHDX'), value, reclaimable !== undefined ? 'warning' : 'file-binary', tooltip);
 	// Managed distros get no inline Compact button: their tool owns the disk.
 	item.contextValue = parent.distro.version === 2 && !managedBy(parent.distro.name) ? 'wslVhdx' : 'wslInfo';
 	return item;
@@ -199,7 +203,7 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 				.map((d) => new DistroItem(d, this.expanded.has(d.name)));
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			return [new MessageItem(`Failed to query wsl.exe: ${message}`, 'error')];
+			return [new MessageItem(vscode.l10n.t('Failed to query wsl.exe: {0}', message), 'error')];
 		}
 	}
 
@@ -219,7 +223,7 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 		restoreInterop([...running])
 			.then((restored) => {
 				if (restored.length > 0) {
-					vscode.window.setStatusBarMessage(`$(check) Restored Windows interop in ${restored.join(', ')}`, 8000);
+					vscode.window.setStatusBarMessage(vscode.l10n.t('$(check) Restored Windows interop in {0}', restored.join(', ')), 8000);
 				}
 			})
 			.catch(() => undefined)
@@ -283,42 +287,42 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 		const children: vscode.TreeItem[] = [
 			new InfoItem(
 				item,
-				'State',
-				distro.running ? 'Running' : 'Stopped',
+				vscode.l10n.t('State'),
+				distro.running ? vscode.l10n.t('Running') : vscode.l10n.t('Stopped'),
 				distro.running ? 'pass-filled' : 'circle-large-outline',
 			),
 			...(distro.running ? this.monitorFor(distro.name).items : []),
-			new InfoItem(item, 'Version', `WSL ${distro.version}`, 'versions'),
-			new InfoItem(item, 'Default', distro.isDefault ? 'yes' : 'no', distro.isDefault ? 'star-full' : 'star-empty'),
+			new InfoItem(item, vscode.l10n.t('Version'), vscode.l10n.t('WSL {0}', distro.version), 'versions'),
+			new InfoItem(item, vscode.l10n.t('Default'), distro.isDefault ? vscode.l10n.t('yes') : vscode.l10n.t('no'), distro.isDefault ? 'star-full' : 'star-empty'),
 		];
 
 		if (runtime?.prettyName) {
-			children.push(new InfoItem(item, 'OS', runtime.prettyName, 'package'));
+			children.push(new InfoItem(item, vscode.l10n.t('OS'), runtime.prettyName, 'package'));
 		} else if (registry?.flavor) {
 			const os = [registry.flavor, registry.osVersion].filter(Boolean).join(' ');
-			children.push(new InfoItem(item, 'OS', os, 'package'));
+			children.push(new InfoItem(item, vscode.l10n.t('OS'), os, 'package'));
 		}
 		if (runtime?.kernel) {
-			children.push(new InfoItem(item, 'Kernel', runtime.kernel, 'chip'));
+			children.push(new InfoItem(item, vscode.l10n.t('Kernel'), runtime.kernel, 'chip'));
 		}
 		if (runtime?.user) {
-			children.push(new InfoItem(item, 'Default user', runtime.user, 'account'));
+			children.push(new InfoItem(item, vscode.l10n.t('Default user'), runtime.user, 'account'));
 		} else if (registry?.defaultUid !== undefined) {
-			const uid = registry.defaultUid === 0 ? 'root (uid 0)' : `uid ${registry.defaultUid}`;
-			children.push(new InfoItem(item, 'Default user', uid, 'account'));
+			const uid = registry.defaultUid === 0 ? vscode.l10n.t('root (uid 0)') : vscode.l10n.t('uid {0}', registry.defaultUid);
+			children.push(new InfoItem(item, vscode.l10n.t('Default user'), uid, 'account'));
 		}
 		if (runtime?.diskUsed !== undefined && runtime.diskSize !== undefined) {
 			children.push(
 				new InfoItem(
 					item,
-					'Disk (/)',
-					`${formatBytes(runtime.diskUsed)} used of ${formatBytes(runtime.diskSize)}`,
+					vscode.l10n.t('Disk (/)'),
+					vscode.l10n.t('{0} used of {1}', formatBytes(runtime.diskUsed), formatBytes(runtime.diskSize)),
 					'database',
 				),
 			);
 		}
 		if (registry?.basePath) {
-			children.push(new InfoItem(item, 'Location', registry.basePath, 'folder'));
+			children.push(new InfoItem(item, vscode.l10n.t('Location'), registry.basePath, 'folder'));
 			if (registry.vhdFileName) {
 				const vhdWindows = path.win32.join(registry.basePath, registry.vhdFileName);
 				const size = await toHostPath(vhdWindows)
@@ -332,8 +336,8 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 		}
 
 		children.push(
-			new ConfigFileItem(item, '/etc/wsl.conf', 'this distro', 'wslManager.editWslConf'),
-			new ConfigFileItem(item, '.wslconfig', 'global (all distros)', 'wslManager.editWslConfig'),
+			new ConfigFileItem(item, '/etc/wsl.conf', vscode.l10n.t('this distro'), 'wslManager.editWslConf'),
+			new ConfigFileItem(item, '.wslconfig', vscode.l10n.t('global (all distros)'), 'wslManager.editWslConfig'),
 		);
 		return children;
 	}

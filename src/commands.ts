@@ -30,13 +30,17 @@ async function pickDistro(
 ): Promise<Distro | undefined> {
 	const distros = (await wsl.list()).filter(filter ?? (() => true));
 	if (distros.length === 0) {
-		vscode.window.showInformationMessage('No WSL distro available for this action.');
+		vscode.window.showInformationMessage(vscode.l10n.t('No WSL distro available for this action.'));
 		return undefined;
 	}
 	const picked = await vscode.window.showQuickPick(
 		distros.map((d) => ({
 			label: d.name,
-			description: `WSL ${d.version} · ${d.running ? 'Running' : 'Stopped'}${d.isDefault ? ' · default' : ''}`,
+			description: [
+				`WSL ${d.version}`,
+				d.running ? vscode.l10n.t('Running') : vscode.l10n.t('Stopped'),
+				...(d.isDefault ? [vscode.l10n.t('default')] : []),
+			].join(' · '),
 			distro: d,
 		})),
 		{ placeHolder },
@@ -77,18 +81,19 @@ async function confirmDestructive(message: string, confirmLabel: string): Promis
 	return choice === confirmLabel;
 }
 
-const WINDOW_WARNING =
-	'This VS Code window is connected to it and will be disconnected.';
+const windowWarning = () => vscode.l10n.t('This VS Code window is connected to it and will be disconnected.');
 
 /** Reasons an action on this distro deserves a warning no setting can turn off. */
 function distroWarnings(distro: string): string[] {
 	const warnings: string[] = [];
 	if (wsl.isCurrentWindowDistro(distro)) {
-		warnings.push(`"${distro}" is the distro of this window. ${WINDOW_WARNING}`);
+		warnings.push(vscode.l10n.t('"{0}" is the distro of this window. {1}', distro, windowWarning()));
 	}
 	const managed = wsl.managedBy(distro);
 	if (managed) {
-		warnings.push(`"${distro}" is managed by ${managed.tool}; changing it here can break ${managed.tool}. ${managed.hint}`);
+		warnings.push(
+			vscode.l10n.t('"{0}" is managed by {1}; changing it here can break {1}. {2}', distro, managed.tool, managed.hint),
+		);
 	}
 	return warnings;
 }
@@ -124,7 +129,7 @@ async function confirmIfManaged(distro: string, message: string, confirmLabel: s
 	}
 	const choice = await vscode.window.showWarningMessage(
 		message,
-		{ modal: true, detail: `"${distro}" is managed by ${managed.tool}. ${managed.hint}` },
+		{ modal: true, detail: vscode.l10n.t('"{0}" is managed by {1}. {2}', distro, managed.tool, managed.hint) },
 		confirmLabel,
 	);
 	return choice === confirmLabel;
@@ -135,12 +140,13 @@ export async function confirmRestartIfCurrentWindow(distro: string): Promise<boo
 	if (!wsl.isCurrentWindowDistro(distro)) {
 		return true;
 	}
+	const restart = vscode.l10n.t('Restart');
 	const choice = await vscode.window.showWarningMessage(
-		`Restart "${distro}"?`,
-		{ modal: true, detail: `"${distro}" is the distro of this window. ${WINDOW_WARNING}` },
-		'Restart',
+		vscode.l10n.t('Restart "{0}"?', distro),
+		{ modal: true, detail: vscode.l10n.t('"{0}" is the distro of this window. {1}', distro, windowWarning()) },
+		restart,
 	);
-	return choice === 'Restart';
+	return choice === restart;
 }
 
 /**
@@ -149,31 +155,28 @@ export async function confirmRestartIfCurrentWindow(distro: string): Promise<boo
  */
 async function confirmShutdown(
 	distro: string,
-	verb: string,
+	title: string,
+	confirmLabel: string,
 	running: string[],
 	detailLead?: string,
 ): Promise<boolean> {
 	const managed = running.filter((name) => wsl.managedBy(name));
+	const tools = [...new Set(managed.map((name) => wsl.managedBy(name)?.tool))].join(' / ');
 	const detail = [
-		`WSL keeps the disk of "${distro}" attached while any distro is running.` + (detailLead ? ` ${detailLead}` : ''),
-		running.length > 0
-			? `Running now: ${running.join(', ')}. They will be stopped` +
-				(running.length > managed.length ? ` and started again afterwards.` : '.')
-			: '',
+		vscode.l10n.t('WSL keeps the disk of "{0}" attached while any distro is running.', distro) +
+			(detailLead ? ` ${detailLead}` : ''),
+		running.length === 0
+			? ''
+			: running.length > managed.length
+				? vscode.l10n.t('Running now: {0}. They will be stopped and started again afterwards.', running.join(', '))
+				: vscode.l10n.t('Running now: {0}. They will be stopped.', running.join(', ')),
 		managed.length > 0
-			? `${managed.join(', ')} ${managed.length === 1 ? 'belongs' : 'belong'} to ${[
-					...new Set(managed.map((name) => wsl.managedBy(name)?.tool)),
-				].join(' / ')} and will not be restarted; start ${managed.length === 1 ? 'it' : 'them'} from that tool.`
+			? vscode.l10n.t('{0} belong to {1} and will not be restarted; start them from that tool.', managed.join(', '), tools)
 			: '',
-		'Every WSL terminal will be closed.',
+		vscode.l10n.t('Every WSL terminal will be closed.'),
 	].filter(Boolean);
-	const label = `Shut Down and ${verb[0].toUpperCase()}${verb.slice(1)}`;
-	const choice = await vscode.window.showWarningMessage(
-		`Shut down WSL to ${verb} "${distro}"?`,
-		{ modal: true, detail: detail.join('\n\n') },
-		label,
-	);
-	return choice === label;
+	const choice = await vscode.window.showWarningMessage(title, { modal: true, detail: detail.join('\n\n') }, confirmLabel);
+	return choice === confirmLabel;
 }
 
 /**
@@ -184,7 +187,7 @@ async function healInteropAfterStop(): Promise<void> {
 	const running = (await wsl.list()).filter((d) => d.running).map((d) => d.name);
 	const restored = await wsl.restoreInterop(running).catch(() => []);
 	if (restored.length > 0) {
-		vscode.window.setStatusBarMessage(`$(check) Restored Windows interop in ${restored.join(', ')}`, 8000);
+		vscode.window.setStatusBarMessage(vscode.l10n.t('$(check) Restored Windows interop in {0}', restored.join(', ')), 8000);
 	}
 }
 
@@ -192,7 +195,7 @@ async function healInteropAfterStop(): Promise<void> {
 async function distroDisk(distro: Distro): Promise<{ vhd: string; vhdHost: string; size: number }> {
 	const registry = (await wsl.registryInfo()).get(distro.name);
 	if (!registry?.basePath || !registry.vhdFileName) {
-		throw new Error(`Could not find the virtual disk of "${distro.name}".`);
+		throw new Error(vscode.l10n.t('Could not find the virtual disk of "{0}".', distro.name));
 	}
 	const vhd = path.win32.join(registry.basePath, registry.vhdFileName);
 	const vhdHost = await wsl.toHostPath(vhd);
@@ -205,11 +208,10 @@ async function distroDisk(distro: Distro): Promise<{ vhd: string; vhdHost: strin
  * WSL releases a disk only when the whole VM stops, which kills those windows,
  * and they do not reliably reconnect: refuse instead. Returns true if refused.
  */
-async function refuseIfShutdownWouldDisconnect(distro: Distro, vhd: string, action: string): Promise<boolean> {
+async function refuseIfShutdownWouldDisconnect(distro: Distro, vhd: string): Promise<boolean> {
 	if (distro.running && process.platform !== 'win32' && wsl.isCurrentWindowDistro(distro.name)) {
 		vscode.window.showWarningMessage(
-			`This extension is running inside "${distro.name}", so it cannot stop it to ${action}. ` +
-				'Run this command from a local VS Code window (not connected to WSL).',
+			vscode.l10n.t('This extension is running inside "{0}", so it cannot stop it. Run this command from a local VS Code window (not connected to WSL).', distro.name),
 		);
 		return true;
 	}
@@ -222,9 +224,8 @@ async function refuseIfShutdownWouldDisconnect(distro: Distro, vhd: string, acti
 		return false;
 	}
 	vscode.window.showWarningMessage(
-		`To ${action}, WSL must shut down, which would disconnect the VS Code windows connected to ` +
-			`${connected.join(', ')}. Nothing was changed.`,
-		{ modal: true, detail: 'Close those windows, then run the command again from a local VS Code window.' },
+		vscode.l10n.t('This needs WSL to shut down, which would disconnect the VS Code windows connected to {0}. Nothing was changed.', connected.join(', ')),
+		{ modal: true, detail: vscode.l10n.t('Close those windows, then run the command again from a local VS Code window.') },
 	);
 	return true;
 }
@@ -238,13 +239,13 @@ async function refuseIfShutdownWouldDisconnect(distro: Distro, vhd: string, acti
 async function releaseDisk(
 	distro: Distro,
 	vhd: string,
-	verb: string,
-	options: { beforeStop?: () => Promise<void>; shutdownDetail?: string } = {},
+	texts: { progress: string; shutdownTitle: string; shutdownLabel: string; shutdownDetail?: string },
+	beforeStop?: () => Promise<void>,
 ): Promise<{ released: boolean; restart: string[] }> {
 	let restart = distro.running ? [distro.name] : [];
-	const free = await withProgress(`${verb[0].toUpperCase()}${verb.slice(1)} ${distro.name}: releasing the disk...`, async () => {
+	const free = await withProgress(texts.progress, async () => {
 		if (distro.running) {
-			await options.beforeStop?.();
+			await beforeStop?.();
 			await wsl.terminate(distro.name);
 			await healInteropAfterStop();
 		}
@@ -255,21 +256,20 @@ async function releaseDisk(
 	}
 	if (process.platform !== 'win32') {
 		throw new Error(
-			`The disk of "${distro.name}" stays attached while WSL is running, and shutting WSL down would stop ` +
-				'this extension, which runs inside WSL. Run the command from a local VS Code window.',
+			vscode.l10n.t('The disk of "{0}" stays attached while WSL is running, and shutting WSL down would stop this extension, which runs inside WSL. Run the command from a local VS Code window.', distro.name),
 		);
 	}
 	const running = (await wsl.list()).filter((d) => d.running).map((d) => d.name);
-	if (!(await confirmShutdown(distro.name, verb, running, options.shutdownDetail))) {
+	if (!(await confirmShutdown(distro.name, texts.shutdownTitle, texts.shutdownLabel, running, texts.shutdownDetail))) {
 		return { released: false, restart };
 	}
 	restart = [...new Set([...restart, ...running])].filter((name) => !wsl.managedBy(name));
-	const released = await withProgress('Shutting down WSL...', async () => {
+	const released = await withProgress(vscode.l10n.t('Shutting down WSL...'), async () => {
 		await wsl.shutdown();
 		return wsl.waitUntilUnlocked(vhd, 15000);
 	});
 	if (!released) {
-		throw new Error(`The disk of "${distro.name}" is still in use by another program.`);
+		throw new Error(vscode.l10n.t('The disk of "{0}" is still in use by another program.', distro.name));
 	}
 	return { released: true, restart };
 }
@@ -278,7 +278,7 @@ async function startAgain(names: string[]): Promise<void> {
 	if (names.length === 0) {
 		return;
 	}
-	await withProgress(`Starting ${names.join(', ')} again...`, async () => {
+	await withProgress(vscode.l10n.t('Starting {0} again...', names.join(', ')), async () => {
 		for (const name of names) {
 			await wsl.start(name).catch(() => undefined);
 		}
@@ -310,7 +310,7 @@ async function withFileProgress<T>(
 			const timer = setInterval(() => {
 				void fs.stat(file).then(
 					(st) => {
-						const written = `${formatBytes(st.size)} written, ${formatElapsed(Date.now() - started)}`;
+						const written = vscode.l10n.t('{0} written, {1}', formatBytes(st.size), formatElapsed(Date.now() - started));
 						if (expectedSize) {
 							const percent = Math.min(99, Math.floor((st.size / expectedSize) * 100));
 							progress.report({ increment: Math.max(0, percent - reported), message: `~${percent}% · ${written}` });
@@ -319,7 +319,7 @@ async function withFileProgress<T>(
 							progress.report({ message: written });
 						}
 					},
-					() => progress.report({ message: `starting, ${formatElapsed(Date.now() - started)}` }),
+					() => progress.report({ message: vscode.l10n.t('starting, {0}', formatElapsed(Date.now() - started)) }),
 				);
 			}, 1000);
 			try {
@@ -354,7 +354,7 @@ export function registerCommands(
 					await handler(...args);
 				} catch (error) {
 					const message = error instanceof Error ? error.message : String(error);
-					vscode.window.showErrorMessage(`WSL: ${message}`);
+					vscode.window.showErrorMessage(vscode.l10n.t('WSL: {0}', message));
 					tree.refresh();
 				}
 			}),
@@ -367,7 +367,7 @@ export function registerCommands(
 	});
 
 	register('wslManager.openWindow', async (arg: unknown) => {
-		const distro = await resolveDistro(arg, 'Open which distro in a new window?');
+		const distro = await resolveDistro(arg, vscode.l10n.t('Open which distro in a new window?'));
 		if (!distro) {
 			return;
 		}
@@ -378,7 +378,7 @@ export function registerCommands(
 	});
 
 	register('wslManager.openTerminal', async (arg: unknown) => {
-		const distro = await resolveDistro(arg, 'Open a terminal in which distro?');
+		const distro = await resolveDistro(arg, vscode.l10n.t('Open a terminal in which distro?'));
 		if (!distro) {
 			return;
 		}
@@ -395,28 +395,28 @@ export function registerCommands(
 	});
 
 	register('wslManager.start', async (arg: unknown) => {
-		const distro = await resolveDistro(arg, 'Start which distro?', (d) => !d.running);
+		const distro = await resolveDistro(arg, vscode.l10n.t('Start which distro?'), (d) => !d.running);
 		if (!distro) {
 			return;
 		}
-		await withProgress(`Starting ${distro.name}...`, () => wsl.start(distro.name));
+		await withProgress(vscode.l10n.t('Starting {0}...', distro.name), () => wsl.start(distro.name));
 		tree.refresh();
 	});
 
 	register('wslManager.terminate', async (arg: unknown) => {
-		const distro = await resolveDistro(arg, 'Stop which distro?', (d) => d.running);
+		const distro = await resolveDistro(arg, vscode.l10n.t('Stop which distro?'), (d) => d.running);
 		if (!distro) {
 			return;
 		}
 		const ok = await confirmDistroAction(
 			distro.name,
-			`Stop "${distro.name}"? Processes running in this distro will be killed.`,
-			'Stop',
+			vscode.l10n.t('Stop "{0}"? Processes running in this distro will be killed.', distro.name),
+			vscode.l10n.t('Stop'),
 		);
 		if (!ok) {
 			return;
 		}
-		await withProgress(`Stopping ${distro.name}...`, async () => {
+		await withProgress(vscode.l10n.t('Stopping {0}...', distro.name), async () => {
 			await wsl.terminate(distro.name);
 			await healInteropAfterStop();
 		});
@@ -424,19 +424,19 @@ export function registerCommands(
 	});
 
 	register('wslManager.restart', async (arg: unknown) => {
-		const distro = await resolveDistro(arg, 'Restart which distro?');
+		const distro = await resolveDistro(arg, vscode.l10n.t('Restart which distro?'));
 		if (!distro) {
 			return;
 		}
 		const ok = await confirmDistroAction(
 			distro.name,
-			`Restart "${distro.name}"? Running processes will be killed.`,
-			'Restart',
+			vscode.l10n.t('Restart "{0}"? Running processes will be killed.', distro.name),
+			vscode.l10n.t('Restart'),
 		);
 		if (!ok) {
 			return;
 		}
-		await withProgress(`Restarting ${distro.name}...`, async () => {
+		await withProgress(vscode.l10n.t('Restarting {0}...', distro.name), async () => {
 			await wsl.terminate(distro.name);
 			await wsl.start(distro.name);
 		});
@@ -444,49 +444,48 @@ export function registerCommands(
 	});
 
 	register('wslManager.setDefault', async (arg: unknown) => {
-		const distro = await resolveDistro(arg, 'Which distro should be the default?', (d) => !d.isDefault);
+		const distro = await resolveDistro(arg, vscode.l10n.t('Which distro should be the default?'), (d) => !d.isDefault);
 		if (!distro) {
 			return;
 		}
-		if (!(await confirmIfManaged(distro.name, `Make "${distro.name}" the default distro?`, 'Set as Default'))) {
+		if (!(await confirmIfManaged(distro.name, vscode.l10n.t('Make "{0}" the default distro?', distro.name), vscode.l10n.t('Set as Default')))) {
 			return;
 		}
 		await wsl.setDefault(distro.name);
-		vscode.window.showInformationMessage(`"${distro.name}" is now the default distro.`);
+		vscode.window.showInformationMessage(vscode.l10n.t('"{0}" is now the default distro.', distro.name));
 		tree.refresh();
 	});
 
 	register('wslManager.setVersion', async (arg: unknown) => {
-		const distro = await resolveDistro(arg, 'Convert which distro?');
+		const distro = await resolveDistro(arg, vscode.l10n.t('Convert which distro?'));
 		if (!distro) {
 			return;
 		}
 		const target = distro.version === 2 ? 1 : 2;
 		const ok = await confirmDistroAction(
 			distro.name,
-			`Convert "${distro.name}" from WSL ${distro.version} to WSL ${target}? ` +
-				'The conversion copies the entire file system and may take several minutes.',
-			`Convert to WSL ${target}`,
+			vscode.l10n.t('Convert "{0}" from WSL {1} to WSL {2}? The conversion copies the entire file system and may take several minutes.', distro.name, distro.version, target),
+			vscode.l10n.t('Convert to WSL {0}', target),
 		);
 		if (!ok) {
 			return;
 		}
-		await withProgress(`Converting ${distro.name} to WSL ${target}...`, () =>
+		await withProgress(vscode.l10n.t('Converting {0} to WSL {1}...', distro.name, target), () =>
 			wsl.setVersion(distro.name, target as 1 | 2),
 		);
 		tree.refresh();
 	});
 
 	register('wslManager.export', async (arg: unknown) => {
-		const distro = await resolveDistro(arg, 'Export which distro?');
+		const distro = await resolveDistro(arg, vscode.l10n.t('Export which distro?'));
 		if (!distro) {
 			return;
 		}
 		const home = await wsl.dialogHomeUri();
 		const target = await vscode.window.showSaveDialog({
-			title: `Export ${distro.name}`,
+			title: vscode.l10n.t('Export {0}', distro.name),
 			defaultUri: vscode.Uri.joinPath(home, `${distro.name}.tar`),
-			filters: { 'Tarball': ['tar'], 'Virtual disk': ['vhdx'] },
+			filters: { [vscode.l10n.t('Tarball')]: ['tar'], [vscode.l10n.t('Virtual disk')]: ['vhdx'] },
 		});
 		if (!target) {
 			return;
@@ -498,24 +497,24 @@ export function registerCommands(
 		const disk = await distroDisk(distro).catch(() => undefined);
 		const used = !isVhd && distro.running ? (await wsl.runtimeInfo(distro.name).catch(() => undefined))?.diskUsed : undefined;
 		const expected = isVhd ? disk?.size : used;
-		const exported = await withFileProgress(`Exporting ${distro.name}`, targetHost, expected, (signal) =>
+		const exported = await withFileProgress(vscode.l10n.t('Exporting {0}', distro.name), targetHost, expected, (signal) =>
 			wsl.exportDistro(distro.name, targetPath, isVhd, signal),
 		);
 		if (exported === undefined) {
 			await fs.rm(targetHost, { force: true });
-			vscode.window.showInformationMessage(`Export of "${distro.name}" cancelled; the partial file was removed.`);
+			vscode.window.showInformationMessage(vscode.l10n.t('Export of "{0}" cancelled; the partial file was removed.', distro.name));
 			return;
 		}
-		vscode.window.showInformationMessage(`"${distro.name}" exported to ${targetPath}`);
+		vscode.window.showInformationMessage(vscode.l10n.t('"{0}" exported to {1}', distro.name, targetPath));
 	});
 
 	register('wslManager.import', async () => {
 		const home = await wsl.dialogHomeUri();
 		const sources = await vscode.window.showOpenDialog({
-			title: 'Select the exported file',
+			title: vscode.l10n.t('Select the exported file'),
 			defaultUri: home,
 			canSelectMany: false,
-			filters: { 'Exported distro': ['tar', 'vhdx'], 'All files': ['*'] },
+			filters: { [vscode.l10n.t('Exported distro')]: ['tar', 'vhdx'], [vscode.l10n.t('All files')]: ['*'] },
 		});
 		const source = sources?.[0];
 		if (!source) {
@@ -525,18 +524,18 @@ export function registerCommands(
 
 		const existing = new Set((await wsl.list()).map((d) => d.name.toLowerCase()));
 		const name = await vscode.window.showInputBox({
-			title: 'Name of the new distro',
+			title: vscode.l10n.t('Name of the new distro'),
 			value: path.win32.parse(sourcePath).name,
 			validateInput: (value) => {
 				const trimmed = value.trim();
 				if (!trimmed) {
-					return 'Enter a name.';
+					return vscode.l10n.t('Enter a name.');
 				}
 				if (existing.has(trimmed.toLowerCase())) {
-					return 'A distro with this name already exists.';
+					return vscode.l10n.t('A distro with this name already exists.');
 				}
 				if (/[\\/:*?"<>|]/.test(trimmed)) {
-					return 'The name cannot contain \\ / : * ? " < > |';
+					return vscode.l10n.t('The name cannot contain \\ / : * ? " < > |');
 				}
 				return undefined;
 			},
@@ -546,7 +545,7 @@ export function registerCommands(
 		}
 
 		const dirs = await vscode.window.showOpenDialog({
-			title: 'Folder where the distro disk will be created',
+			title: vscode.l10n.t('Folder where the distro disk will be created'),
 			defaultUri: home,
 			canSelectFiles: false,
 			canSelectFolders: true,
@@ -560,7 +559,7 @@ export function registerCommands(
 		// The new distro's VHDX must live on a Windows drive, not inside another distro.
 		if (wsl.isInsideDistro(installPath)) {
 			vscode.window.showErrorMessage(
-				`Cannot install into ${installPath}. Choose a folder on a Windows drive (for example under /mnt/c or C:\\).`,
+				vscode.l10n.t('Cannot install into {0}. Choose a folder on a Windows drive (for example under /mnt/c or C:\\).', installPath),
 			);
 			return;
 		}
@@ -570,7 +569,7 @@ export function registerCommands(
 		// WSL creates ext4.vhdx in the install folder; it ends up close to the source's size.
 		const sourceSize = await wsl.toHostPath(sourcePath).then((p) => fs.stat(p)).then((st) => st.size, () => undefined);
 		const vhdxHost = path.join(await wsl.toHostPath(installPath), 'ext4.vhdx');
-		const imported = await withFileProgress(`Importing ${distroName}`, vhdxHost, sourceSize, (signal) =>
+		const imported = await withFileProgress(vscode.l10n.t('Importing {0}', distroName), vhdxHost, sourceSize, (signal) =>
 			wsl.importDistro(distroName, installPath, sourcePath, isVhd, signal),
 		);
 		tree.refresh();
@@ -580,48 +579,51 @@ export function registerCommands(
 				await wsl.unregister(distroName).catch(() => undefined);
 				tree.refresh();
 			}
-			vscode.window.showInformationMessage(`Import of "${distroName}" cancelled.`);
+			vscode.window.showInformationMessage(vscode.l10n.t('Import of "{0}" cancelled.', distroName));
 			return;
 		}
-		vscode.window.showInformationMessage(`Distro "${distroName}" imported.`);
+		vscode.window.showInformationMessage(vscode.l10n.t('Distro "{0}" imported.', distroName));
 	});
 
 	register('wslManager.unregister', async (arg: unknown) => {
-		const distro = await resolveDistro(arg, 'Unregister which distro?');
+		const distro = await resolveDistro(arg, vscode.l10n.t('Unregister which distro?'));
 		if (!distro) {
 			return;
 		}
 		// Unregister deletes the whole disk and cannot be undone: require typing the name.
 		const typed = await vscode.window.showInputBox({
-			title: `Permanently unregister "${distro.name}"`,
-			prompt: [`This deletes ALL data in "${distro.name}".`, ...distroWarnings(distro.name), 'Type the name to confirm.'].join(' '),
+			title: vscode.l10n.t('Permanently unregister "{0}"', distro.name),
+			prompt: [
+				vscode.l10n.t('This deletes ALL data in "{0}".', distro.name),
+				...distroWarnings(distro.name),
+				vscode.l10n.t('Type the name to confirm.'),
+			].join(' '),
 			placeHolder: distro.name,
 			validateInput: (value) =>
-				value === distro.name ? undefined : `Type exactly: ${distro.name}`,
+				value === distro.name ? undefined : vscode.l10n.t('Type exactly: {0}', distro.name),
 		});
 		if (typed !== distro.name) {
 			return;
 		}
-		await withProgress(`Unregistering ${distro.name}...`, async () => {
+		await withProgress(vscode.l10n.t('Unregistering {0}...', distro.name), async () => {
 			await wsl.unregister(distro.name);
 			await healInteropAfterStop();
 		});
-		vscode.window.showInformationMessage(`"${distro.name}" was unregistered.`);
+		vscode.window.showInformationMessage(vscode.l10n.t('"{0}" was unregistered.', distro.name));
 		tree.refresh();
 	});
 
 	register('wslManager.shutdown', async () => {
 		const message =
-			'Shut down WSL? Every running distro will be stopped immediately, ' +
-			'including VS Code windows connected to them.';
+			vscode.l10n.t('Shut down WSL? Every running distro will be stopped immediately, including VS Code windows connected to them.');
 		const current = wsl.currentWindowDistro();
 		const ok = current
-			? await confirmDistroAction(current, message, 'Shut Down WSL')
-			: await confirmDestructive(message, 'Shut Down WSL');
+			? await confirmDistroAction(current, message, vscode.l10n.t('Shut Down WSL'))
+			: await confirmDestructive(message, vscode.l10n.t('Shut Down WSL'));
 		if (!ok) {
 			return;
 		}
-		await withProgress('Shutting down WSL...', () => wsl.shutdown());
+		await withProgress(vscode.l10n.t('Shutting down WSL...'), () => wsl.shutdown());
 		tree.refresh();
 	});
 
@@ -631,11 +633,11 @@ export function registerCommands(
 	});
 
 	register('wslManager.editWslConf', async (arg: unknown) => {
-		const distro = await resolveDistro(arg, 'Edit wsl.conf of which distro?');
+		const distro = await resolveDistro(arg, vscode.l10n.t('Edit wsl.conf of which distro?'));
 		if (!distro) {
 			return;
 		}
-		if (!(await confirmIfManaged(distro.name, `Edit /etc/wsl.conf of "${distro.name}"?`, 'Edit'))) {
+		if (!(await confirmIfManaged(distro.name, vscode.l10n.t('Edit /etc/wsl.conf of "{0}"?', distro.name), vscode.l10n.t('Edit')))) {
 			return;
 		}
 		const doc = await vscode.workspace.openTextDocument(distroUri(distro.name));
@@ -643,16 +645,16 @@ export function registerCommands(
 	});
 
 	register('wslManager.compact', async (arg: unknown) => {
-		const distro = await resolveDistro(arg, 'Compact the disk of which distro?', (d) => d.version === 2);
+		const distro = await resolveDistro(arg, vscode.l10n.t('Compact the disk of which distro?'), (d) => d.version === 2);
 		if (!distro) {
 			return;
 		}
 		if (distro.version !== 2) {
-			vscode.window.showInformationMessage('Only WSL 2 distros have a virtual disk to compact.');
+			vscode.window.showInformationMessage(vscode.l10n.t('Only WSL 2 distros have a virtual disk to compact.'));
 			return;
 		}
 		const { vhd, vhdHost, size: sizeBefore } = await distroDisk(distro);
-		if (await refuseIfShutdownWouldDisconnect(distro, vhd, `compact "${distro.name}"`)) {
+		if (await refuseIfShutdownWouldDisconnect(distro, vhd)) {
 			return;
 		}
 
@@ -661,19 +663,18 @@ export function registerCommands(
 		const reclaimable = estimateReclaimable(sizeBefore, used);
 		const expectation =
 			used === undefined
-				? 'The distro is stopped, so the space to reclaim cannot be estimated.'
+				? vscode.l10n.t('The distro is stopped, so the space to reclaim cannot be estimated.')
 				: reclaimable !== undefined
-					? `About ${formatBytes(reclaimable)} can be reclaimed.`
-					: `Little to reclaim: the disk holds ${formatBytes(used)} and is only ${formatBytes(sizeBefore - used)} larger, ` +
-						'which is mostly file system overhead. Compacting now will likely gain almost nothing.';
+					? vscode.l10n.t('About {0} can be reclaimed.', formatBytes(reclaimable))
+					: vscode.l10n.t('Little to reclaim: the disk holds {0} and is only {1} larger, which is mostly file system overhead. Compacting now will likely gain almost nothing.', formatBytes(used), formatBytes(sizeBefore - used));
 
 		const ok = await confirmDistroAction(
 			distro.name,
-			`Compact the disk of "${distro.name}" (${formatBytes(sizeBefore)})?`,
-			'Compact',
+			vscode.l10n.t('Compact the disk of "{0}" ({1})?', distro.name, formatBytes(sizeBefore)),
+			vscode.l10n.t('Compact'),
 			`${expectation}\n\n` +
-				(distro.running ? 'The distro will be stopped while its disk is compacted, then started again. ' : '') +
-				'Windows will ask for administrator permission to run diskpart.',
+				(distro.running ? vscode.l10n.t('The distro will be stopped while its disk is compacted, then started again. ') : '') +
+				vscode.l10n.t('Windows will ask for administrator permission to run diskpart.'),
 		);
 		if (!ok) {
 			return;
@@ -681,16 +682,24 @@ export function registerCommands(
 
 		let restart: string[] = [];
 		try {
-			const release = await releaseDisk(distro, vhd, 'compact', {
+			const release = await releaseDisk(
+				distro,
+				vhd,
+				{
+					progress: vscode.l10n.t('Compacting {0}: releasing the disk...', distro.name),
+					shutdownTitle: vscode.l10n.t('Shut down WSL to compact "{0}"?', distro.name),
+					shutdownLabel: vscode.l10n.t('Shut Down and Compact'),
+					shutdownDetail:
+						reclaimable !== undefined ? vscode.l10n.t('Expected gain: about {0}.', formatBytes(reclaimable)) : undefined,
+				},
 				// WSL mounts with discard, so this mostly catches leftovers; it is cheap.
-				beforeStop: () =>
+				() =>
 					wsl
 						.run(['--distribution', distro.name, '--user', 'root', '--exec', '/bin/sh', '-c', 'fstrim -a'], {
 							tolerateFailure: true,
 						})
 						.then(() => undefined),
-				shutdownDetail: reclaimable !== undefined ? `Expected gain: about ${formatBytes(reclaimable)}.` : undefined,
-			});
+			);
 			restart = release.restart;
 			if (!release.released) {
 				return;
@@ -700,14 +709,14 @@ export function registerCommands(
 			const result = await vscode.window.withProgress(
 				{
 					location: vscode.ProgressLocation.Notification,
-					title: `Compacting ${distro.name} (${formatBytes(sizeBefore)})`,
+					title: vscode.l10n.t('Compacting {0} ({1})', distro.name, formatBytes(sizeBefore)),
 				},
 				async (progress) => {
-					progress.report({ message: 'waiting for administrator permission...' });
+					progress.report({ message: vscode.l10n.t('waiting for administrator permission...') });
 					// diskpart reports no progress; show elapsed time so a long run does not look stuck.
 					const timer = setInterval(() => {
 						progress.report({
-							message: `running diskpart, ${formatElapsed(Date.now() - started)} elapsed. Large disks take several minutes.`,
+							message: vscode.l10n.t('running diskpart, {0} elapsed. Large disks take several minutes.', formatElapsed(Date.now() - started)),
 						});
 					}, 1000);
 					try {
@@ -719,14 +728,14 @@ export function registerCommands(
 			);
 			if (result.code !== 0) {
 				const tail = result.log.trim().split(/\r?\n/).slice(-3).join(' ');
-				throw new Error(`diskpart failed (exit code ${result.code}): ${tail}`);
+				throw new Error(vscode.l10n.t('diskpart failed (exit code {0}): {1}', result.code, tail));
 			}
 			const sizeAfter = (await fs.stat(vhdHost)).size;
 			const saved = sizeBefore - sizeAfter;
 			vscode.window.showInformationMessage(
 				saved > 0
-					? `"${distro.name}" compacted: ${formatBytes(sizeBefore)} → ${formatBytes(sizeAfter)} (${formatBytes(saved)} reclaimed).`
-					: `"${distro.name}" was already compact (${formatBytes(sizeAfter)}).`,
+					? vscode.l10n.t('"{0}" compacted: {1} → {2} ({3} reclaimed).', distro.name, formatBytes(sizeBefore), formatBytes(sizeAfter), formatBytes(saved))
+					: vscode.l10n.t('"{0}" was already compact ({1}).', distro.name, formatBytes(sizeAfter)),
 			);
 		} finally {
 			await startAgain(restart);
@@ -736,17 +745,17 @@ export function registerCommands(
 	});
 
 	register('wslManager.move', async (arg: unknown) => {
-		const distro = await resolveDistro(arg, 'Move which distro?', (d) => d.version === 2 && !wsl.managedBy(d.name));
+		const distro = await resolveDistro(arg, vscode.l10n.t('Move which distro?'), (d) => d.version === 2 && !wsl.managedBy(d.name));
 		if (!distro) {
 			return;
 		}
 		if (distro.version !== 2) {
-			vscode.window.showInformationMessage('Only WSL 2 distros can be moved.');
+			vscode.window.showInformationMessage(vscode.l10n.t('Only WSL 2 distros can be moved.'));
 			return;
 		}
 		const { vhd, size } = await distroDisk(distro);
 		const dirs = await vscode.window.showOpenDialog({
-			title: `New folder for ${distro.name} (${formatBytes(size)})`,
+			title: vscode.l10n.t('New folder for {0} ({1})', distro.name, formatBytes(size)),
 			defaultUri: await wsl.dialogHomeUri(),
 			canSelectFiles: false,
 			canSelectFolders: true,
@@ -757,21 +766,21 @@ export function registerCommands(
 		}
 		const destination = await wsl.toWindowsPath(dirs[0]);
 		if (wsl.isInsideDistro(destination)) {
-			vscode.window.showErrorMessage(`Cannot move into ${destination}. Choose a folder on a Windows drive.`);
+			vscode.window.showErrorMessage(vscode.l10n.t('Cannot move into {0}. Choose a folder on a Windows drive.', destination));
 			return;
 		}
 		if (path.win32.resolve(destination).toLowerCase() === path.win32.dirname(vhd).toLowerCase()) {
-			vscode.window.showInformationMessage(`"${distro.name}" is already in ${destination}.`);
+			vscode.window.showInformationMessage(vscode.l10n.t('"{0}" is already in {1}.', distro.name, destination));
 			return;
 		}
-		if (await refuseIfShutdownWouldDisconnect(distro, vhd, `move "${distro.name}"`)) {
+		if (await refuseIfShutdownWouldDisconnect(distro, vhd)) {
 			return;
 		}
 		const ok = await confirmDistroAction(
 			distro.name,
-			`Move "${distro.name}" (${formatBytes(size)}) to ${destination}?`,
-			'Move',
-			distro.running ? 'The distro will be stopped while its disk is copied, then started again.' : undefined,
+			vscode.l10n.t('Move "{0}" ({1}) to {2}?', distro.name, formatBytes(size), destination),
+			vscode.l10n.t('Move'),
+			distro.running ? vscode.l10n.t('The distro will be stopped while its disk is copied, then started again.') : undefined,
 		);
 		if (!ok) {
 			return;
@@ -779,19 +788,23 @@ export function registerCommands(
 
 		let restart: string[] = [];
 		try {
-			const release = await releaseDisk(distro, vhd, 'move');
+			const release = await releaseDisk(distro, vhd, {
+				progress: vscode.l10n.t('Moving {0}: releasing the disk...', distro.name),
+				shutdownTitle: vscode.l10n.t('Shut down WSL to move "{0}"?', distro.name),
+				shutdownLabel: vscode.l10n.t('Shut Down and Move'),
+			});
 			restart = release.restart;
 			if (!release.released) {
 				return;
 			}
 			const target = path.join(await wsl.toHostPath(destination), path.win32.basename(vhd));
-			const moved = await withFileProgress(`Moving ${distro.name} to ${destination}`, target, size, (signal) =>
+			const moved = await withFileProgress(vscode.l10n.t('Moving {0} to {1}', distro.name, destination), target, size, (signal) =>
 				wsl.moveDistro(distro.name, destination, signal),
 			);
 			vscode.window.showInformationMessage(
 				moved === undefined
-					? `Move cancelled; "${distro.name}" stays in ${path.win32.dirname(vhd)}.`
-					: `"${distro.name}" moved to ${destination}.`,
+					? vscode.l10n.t('Move cancelled; "{0}" stays in {1}.', distro.name, path.win32.dirname(vhd))
+					: vscode.l10n.t('"{0}" moved to {1}.', distro.name, destination),
 			);
 		} finally {
 			await startAgain(restart);
@@ -801,36 +814,36 @@ export function registerCommands(
 	});
 
 	register('wslManager.install', async () => {
-		const online = await withProgress('Fetching the list of distros...', () => wsl.listOnline());
+		const online = await withProgress(vscode.l10n.t('Fetching the list of distros...'), () => wsl.listOnline());
 		if (online.length === 0) {
-			throw new Error('Could not read the list of installable distros (wsl --list --online).');
+			throw new Error(vscode.l10n.t('Could not read the list of installable distros (wsl --list --online).'));
 		}
 		const installed = new Set((await wsl.list()).map((d) => d.name.toLowerCase()));
 		const picked = await vscode.window.showQuickPick(
 			online.map((d) => ({
 				label: d.name,
 				description: d.friendlyName,
-				detail: installed.has(d.name.toLowerCase()) ? 'Installed; pick a different name for another copy' : undefined,
+				detail: installed.has(d.name.toLowerCase()) ? vscode.l10n.t('Installed; pick a different name for another copy') : undefined,
 				distro: d,
 			})),
-			{ title: 'Install a WSL distro', placeHolder: 'Distro to install', matchOnDescription: true },
+			{ title: vscode.l10n.t('Install a WSL distro'), placeHolder: vscode.l10n.t('Distro to install'), matchOnDescription: true },
 		);
 		if (!picked) {
 			return;
 		}
 		const name = await vscode.window.showInputBox({
-			title: `Name for the new ${picked.distro.friendlyName}`,
+			title: vscode.l10n.t('Name for the new {0}', picked.distro.friendlyName),
 			value: installed.has(picked.distro.name.toLowerCase()) ? `${picked.distro.name}-2` : picked.distro.name,
 			validateInput: (value) => {
 				const trimmed = value.trim();
 				if (!trimmed) {
-					return 'Enter a name.';
+					return vscode.l10n.t('Enter a name.');
 				}
 				if (installed.has(trimmed.toLowerCase())) {
-					return 'A distro with this name already exists.';
+					return vscode.l10n.t('A distro with this name already exists.');
 				}
 				if (/[\\/:*?"<>|\s]/.test(trimmed)) {
-					return 'The name cannot contain spaces or \\ / : * ? " < > |';
+					return vscode.l10n.t('The name cannot contain spaces or \\ / : * ? " < > |');
 				}
 				return undefined;
 			},
@@ -840,10 +853,10 @@ export function registerCommands(
 		}
 		const where = await vscode.window.showQuickPick(
 			[
-				{ label: 'Default location', description: 'Where WSL puts new distros', choose: false },
-				{ label: 'Choose a folder...', description: 'For example on another drive', choose: true },
+				{ label: vscode.l10n.t('Default location'), description: vscode.l10n.t('Where WSL puts new distros'), choose: false },
+				{ label: vscode.l10n.t('Choose a folder...'), description: vscode.l10n.t('For example on another drive'), choose: true },
 			],
-			{ title: `Where to install ${name.trim()}` },
+			{ title: vscode.l10n.t('Where to install {0}', name.trim()) },
 		);
 		if (!where) {
 			return;
@@ -851,7 +864,7 @@ export function registerCommands(
 		let location: string | undefined;
 		if (where.choose) {
 			const dirs = await vscode.window.showOpenDialog({
-				title: `Folder for ${name.trim()}`,
+				title: vscode.l10n.t('Folder for {0}', name.trim()),
 				defaultUri: await wsl.dialogHomeUri(),
 				canSelectFiles: false,
 				canSelectFolders: true,
@@ -862,7 +875,7 @@ export function registerCommands(
 			}
 			location = await wsl.toWindowsPath(dirs[0]);
 			if (wsl.isInsideDistro(location)) {
-				vscode.window.showErrorMessage(`Cannot install into ${location}. Choose a folder on a Windows drive.`);
+				vscode.window.showErrorMessage(vscode.l10n.t('Cannot install into {0}. Choose a folder on a Windows drive.', location));
 				return;
 			}
 		}
@@ -870,7 +883,7 @@ export function registerCommands(
 		const done = await vscode.window.withProgress(
 			{
 				location: vscode.ProgressLocation.Notification,
-				title: `Installing ${name.trim()} (${picked.distro.friendlyName})`,
+				title: vscode.l10n.t('Installing {0} ({1})', name.trim(), picked.distro.friendlyName),
 				cancellable: true,
 			},
 			async (progress, token) => {
@@ -878,7 +891,7 @@ export function registerCommands(
 				token.onCancellationRequested(() => controller.abort());
 				const started = Date.now();
 				const timer = setInterval(
-					() => progress.report({ message: `downloading and installing, ${formatElapsed(Date.now() - started)}` }),
+					() => progress.report({ message: vscode.l10n.t('downloading and installing, {0}', formatElapsed(Date.now() - started)) }),
 					1000,
 				);
 				try {
@@ -901,13 +914,13 @@ export function registerCommands(
 				await wsl.unregister(name.trim()).catch(() => undefined);
 				tree.refresh();
 			}
-			vscode.window.showInformationMessage(`Installation of "${name.trim()}" cancelled.`);
+			vscode.window.showInformationMessage(vscode.l10n.t('Installation of "{0}" cancelled.', name.trim()));
 			return;
 		}
 		// --no-launch skips the first-run setup, which creates the default user.
 		const choice = await vscode.window.showInformationMessage(
-			`"${name.trim()}" installed. Open a terminal to finish its setup (create the default user)?`,
-			'Open Terminal',
+			vscode.l10n.t('"{0}" installed. Open a terminal to finish its setup (create the default user)?', name.trim()),
+			vscode.l10n.t('Open Terminal'),
 		);
 		if (choice) {
 			await vscode.commands.executeCommand('wslManager.openTerminal', name.trim());
@@ -916,16 +929,16 @@ export function registerCommands(
 
 	register('wslManager.repairInterop', async () => {
 		const running = (await wsl.list()).filter((d) => d.running).map((d) => d.name);
-		const restored = await withProgress('Checking Windows interop...', () => wsl.restoreInterop(running));
+		const restored = await withProgress(vscode.l10n.t('Checking Windows interop...'), () => wsl.restoreInterop(running));
 		vscode.window.showInformationMessage(
 			restored.length > 0
-				? `Restored Windows interop in ${restored.join(', ')}.`
-				: 'Windows interop is working in every running distro.',
+				? vscode.l10n.t('Restored Windows interop in {0}.', restored.join(', '))
+				: vscode.l10n.t('Windows interop is working in every running distro.'),
 		);
 	});
 
 	register('wslManager.copyName', async (arg: unknown) => {
-		const distro = await resolveDistro(arg, 'Copy the name of which distro?');
+		const distro = await resolveDistro(arg, vscode.l10n.t('Copy the name of which distro?'));
 		if (!distro) {
 			return;
 		}

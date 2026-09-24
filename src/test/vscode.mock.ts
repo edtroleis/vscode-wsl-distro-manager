@@ -101,5 +101,11 @@ export const env = {
 	remoteName: undefined as string | undefined,
 };
 
+/** English passthrough of vscode.l10n: fills {0}-style placeholders. */
+export const l10n = {
+	t: (message: string, ...args: unknown[]): string =>
+		message.replace(/\{(\d+)\}/g, (match, index) => (Number(index) < args.length ? String(args[Number(index)]) : match)),
+};
+
 export const window = {};
 export const commands = {};

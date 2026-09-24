@@ -61,6 +61,8 @@ Windows host.
   - [ ] With no window connected and another distro running, it explains that WSL must shut down, lists the running distros, and offers **Shut Down and Compact**; the progress shows the elapsed time.
   - [ ] Accepting it compacts the disk, reports the before/after size, and restarts the distros that were running (not Podman/Docker ones).
 
+- [ ] With VS Code in Portuguese (*Configure Display Language* → pt-br, with the Portuguese (Brazil) Language Pack), the view, menus, dialogs, and settings are in Portuguese.
+
 ## 4. Manual checks (window connected to WSL)
 
 - [ ] The connected distro is tagged **this window**.

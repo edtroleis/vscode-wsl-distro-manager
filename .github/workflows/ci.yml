@@ -16,3 +16,5 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: Localization bundle is up to date
+        run: npm run l10n && git diff --exit-code l10n/bundle.l10n.json

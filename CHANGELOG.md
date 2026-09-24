@@ -10,6 +10,7 @@ Initial release.
 - Compact a distro's VHDX with diskpart to give disk space back to Windows. When WSL keeps the disk attached (any distro running), it offers to shut WSL down and restarts the distros afterwards.
 - The reclaimable-space estimate only appears when a compaction is worth it (gap of at least 2 GB and 10% of the used space); the confirmation states the expected gain.
 - Compaction never shuts WSL down while a VS Code window is connected to it: it stops, changes nothing, and names the windows to close.
+- English and Brazilian Portuguese, following VS Code's display language.
 - Start, stop, restart, set default, convert WSL 1/2, export, import, unregister, shut down WSL.
 - Install distros from the online catalog (name and location of your choice) and move a distro's disk to another folder or drive.
 - Export, import, move, and install show progress and can be cancelled; a cancelled export deletes its partial file and a cancelled import leaves nothing registered.
