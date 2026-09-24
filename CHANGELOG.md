@@ -14,6 +14,12 @@ project follows [Semantic Versioning](https://semver.org/).
   page, the changelog, and a new issue.
 - The log in the Output panel starts with the extension's version.
 
+### Changed
+
+- The gear in the view's title bar opens the extension's settings. The global
+  `.wslconfig` opens from *Settings (.wslconfig)* under the **WSL** node, or
+  with *Edit .wslconfig (Global)* in the Command Palette.
+
 ## [0.0.2] - 2026-09-24
 
 ### Fixed

@@ -185,6 +185,9 @@ warns first, because doing it from here can break that tool. Set
 
 ## Settings
 
+Open them with the gear in the view's title bar, or search for
+`wslManager` in **Settings**.
+
 | Setting | Default | Description |
 |---|---|---|
 | `wslManager.clickAction` | `expand` | What clicking a distro does: `expand`, `terminal`, `window`, or `none`. |

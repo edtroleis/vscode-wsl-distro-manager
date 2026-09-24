@@ -4,6 +4,7 @@
   "command.refresh": "Atualizar",
   "command.shutdown": "Desligar o WSL (wsl --shutdown)",
   "command.repairInterop": "Reparar a Interoperabilidade com o Windows",
+  "command.openSettings": "Configurações da Extensão",
   "command.editWslConfig": "Editar .wslconfig (Global)",
   "command.install": "Instalar Distro...",
   "command.import": "Importar Distro...",

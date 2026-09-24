@@ -40,7 +40,12 @@ export function activate(context: vscode.ExtensionContext): void {
 	);
 
 	registerCommands(context, tree);
-	context.subscriptions.push(vscode.commands.registerCommand('wslManager.about', () => about(context)));
+	context.subscriptions.push(
+		vscode.commands.registerCommand('wslManager.about', () => about(context)),
+		vscode.commands.registerCommand('wslManager.openSettings', () =>
+			vscode.commands.executeCommand('workbench.action.openSettings', `@ext:${context.extension.id}`),
+		),
+	);
 	context.subscriptions.push(vscode.workspace.onDidSaveTextDocument(onConfigSaved));
 }
 

@@ -113,6 +113,12 @@
         "command": "wslManager.editWslConfig",
         "title": "%command.editWslConfig%",
         "category": "Distro Manager for WSL",
+        "icon": "$(file-code)"
+      },
+      {
+        "command": "wslManager.openSettings",
+        "title": "%command.openSettings%",
+        "category": "Distro Manager for WSL",
         "icon": "$(settings-gear)"
       },
       {
@@ -224,7 +230,7 @@
           "group": "navigation@1"
         },
         {
-          "command": "wslManager.editWslConfig",
+          "command": "wslManager.openSettings",
           "when": "view == wslManager.distros",
           "group": "navigation@2"
         },
