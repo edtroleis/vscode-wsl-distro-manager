@@ -30,5 +30,9 @@
   "config.clickAction.window": "Abre uma nova janela do VS Code conectada à distro (expanda pela seta).",
   "config.clickAction.none": "Não faz nada; use os botões e o menu de contexto.",
   "config.showManagedDistros": "Mostrar as distros criadas pelo Docker Desktop, Podman e Rancher Desktop (`docker-desktop`, `podman-*`, ...). Elas ficam marcadas e protegidas por avisos extras de qualquer forma.",
-  "config.confirmDestructiveActions": "Pedir confirmação antes de terminate, shutdown e unregister."
+  "config.confirmDestructiveActions": "Pedir confirmação antes de terminate, shutdown e unregister.",
+  "command.backup": "Fazer Backup de Pastas...",
+  "command.sendFiles": "Enviar Arquivos para a Distro...",
+  "config.backupFolder": "Pasta do Windows oferecida primeiro em *Fazer Backup de Pastas*. Vazio = a Área de Trabalho do Windows (onde quer que esteja redirecionada, como no OneDrive).",
+  "config.backupExcludes": "Nomes de pastas e arquivos deixados fora dos backups, em qualquer nível. Editável a cada backup."
 }

@@ -707,3 +707,96 @@ export async function restoreInterop(distros: string[]): Promise<string[]> {
 	}
 	return restored;
 }
+
+let cachedDesktop: string | undefined;
+
+/**
+ * The real Windows Desktop folder. It is often redirected (for example to
+ * OneDrive\Área de Trabalho), so %USERPROFILE%\Desktop is not reliable. Windows
+ * PowerShell writes in the legacy code page, which garbles accented folder
+ * names, so ask it for UTF-8 output.
+ */
+export async function windowsDesktopDir(): Promise<string> {
+	if (cachedDesktop) {
+		return cachedDesktop;
+	}
+	const result = await spawnCapture(
+		powershellPath(),
+		['-NoProfile', '-NonInteractive', '-Command', "[Console]::OutputEncoding = [Text.Encoding]::UTF8; [Environment]::GetFolderPath('Desktop')"],
+		{ cwd: process.platform === 'win32' ? undefined : '/mnt/c' },
+	);
+	const desktop = result.stdout.trim();
+	if (!/^[A-Za-z]:\\/.test(desktop)) {
+		throw new Error(vscode.l10n.t('Could not find the Windows Desktop folder.'));
+	}
+	cachedDesktop = desktop;
+	return desktop;
+}
+
+/** Runs a program inside the distro as its default user, starting in the home folder. */
+export function runAsUser(distro: string, argv: string[], opts: RunOptions = {}): Promise<RunResult> {
+	return run(['--distribution', distro, '--cd', '~', '--exec', ...argv], { tolerateFailure: true, ...opts });
+}
+
+/** A Windows path as the distro sees it (C:\x -> /mnt/c/x). */
+export async function linuxPathInDistro(distro: string, windowsPath: string): Promise<string> {
+	const result = await runAsUser(distro, ['wslpath', '-u', windowsPath]);
+	const linux = result.stdout.trim();
+	if (result.code !== 0 || !linux.startsWith('/')) {
+		throw new Error(vscode.l10n.t('Could not translate {0} to a path inside {1}.', windowsPath, distro));
+	}
+	return linux;
+}
+
+export interface HomeEntry {
+	name: string;
+	isDir: boolean;
+}
+
+/** Entries of the default user's home folder, dotfiles included. */
+export async function listHome(distro: string): Promise<HomeEntry[]> {
+	const result = await runAsUser(distro, ['ls', '-1Ap']);
+	return parseHomeListing(result.stdout);
+}
+
+/** Pure part of listHome(): `ls -1Ap` marks folders with a trailing slash. */
+export function parseHomeListing(stdout: string): HomeEntry[] {
+	return stdout
+		.split(/\r?\n/)
+		.filter((line) => line.length > 0)
+		.map((line) => (line.endsWith('/') ? { name: line.slice(0, -1), isDir: true } : { name: line, isDir: false }));
+}
+
+export async function hasCommand(distro: string, command: string): Promise<boolean> {
+	const result = await runAsUser(distro, ['sh', '-c', 'command -v "$1" >/dev/null', 'sh', command]);
+	return result.code === 0;
+}
+
+export type FolderAccess = { state: 'ok' | 'denied'; path: string };
+
+/**
+ * Resolves a folder inside the distro for the default user (~ and relative
+ * paths are from home), creating it if missing, and says whether that user may
+ * write there. Nothing runs as root: a folder that needs sudo is 'denied'.
+ */
+export async function userFolderAccess(distro: string, folder: string): Promise<FolderAccess> {
+	const script =
+		'd=$1; case "$d" in "~") d=$HOME ;; "~/"*) d="$HOME/${d#??}" ;; /*) ;; *) d="$HOME/$d" ;; esac; ' +
+		'if [ -d "$d" ] || mkdir -p -- "$d" 2>/dev/null; then ' +
+		'if [ -w "$d" ]; then echo "ok:$d"; else echo "denied:$d"; fi; ' +
+		'else echo "denied:$d"; fi';
+	const result = await runAsUser(distro, ['sh', '-c', script, 'sh', folder]);
+	return parseFolderAccess(result.stdout, folder);
+}
+
+export function parseFolderAccess(stdout: string, requested: string): FolderAccess {
+	const match = /^(ok|denied):(.*)$/m.exec(stdout.trim());
+	return match ? { state: match[1] as 'ok' | 'denied', path: match[2] } : { state: 'denied', path: requested };
+}
+
+/** Which of these names already exist in the folder. */
+export async function existingNames(distro: string, folder: string, names: string[]): Promise<string[]> {
+	const script = 'd=$1; shift; for n in "$@"; do [ -e "$d/$n" ] && printf "%s\\n" "$n"; done; exit 0';
+	const result = await runAsUser(distro, ['sh', '-c', script, 'sh', folder, ...names]);
+	return result.stdout.split(/\r?\n/).filter(Boolean);
+}

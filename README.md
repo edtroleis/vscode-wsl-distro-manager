@@ -24,6 +24,8 @@ official extension does not: start/stop, `--set-default`, export/import,
 | Install a distro from the online catalog | `wsl --list --online`, `wsl --install <d> --name <n> [--location <dir>] --no-launch` |
 | Export / Import (`.tar` or `.vhdx`), with progress and cancel | `wsl --export` / `wsl --import` |
 | Move a distro's disk to another folder or drive | `wsl --manage <d> --move <dir>` |
+| Back up chosen folders to a `.tar.gz` / `.zip` on Windows | `tar` / `zip` inside the distro, as your user |
+| Send Windows files into the distro, and restore backups there | `cp`, `tar -x` / `unzip` inside the distro, as your user |
 | Unregister a distro | `wsl --unregister <d>` |
 | Shut down WSL | `wsl --shutdown` |
 | Open a terminal | `wsl -d <d> [-u <user>]` |
@@ -81,6 +83,29 @@ WSL terminals are closed by the shutdown. `diskpart` reports no progress, and a
 
 ![Progress notification: running diskpart, 0m 14s elapsed](images/compact-progress.png)
 
+### Backups and sending files
+
+**Back Up Folders...** archives folders and files of your choice from the distro
+into one file on Windows, without exporting the whole distro. Pick entries of
+your home folder from a list, or type paths (relative to home, or absolute). The
+file goes to your Windows **Desktop** by default, found through Windows, so a
+Desktop redirected to OneDrive works too; `wslManager.backupFolder` or
+*Choose a folder...* picks another place. Folders such as `node_modules`,
+`.venv`, and `target` are left out by default (`wslManager.backupExcludes`,
+editable each time).
+
+`.tar.gz` is the default because it keeps Linux permissions and symlinks;
+`.zip` opens anywhere but loses them, so scripts stop being executable after a
+restore. The archiver runs inside the distro as your user: files you cannot
+read are left out, and the result says so. Absolute paths are stored without the
+leading `/`.
+
+**Send Files to Distro...** copies Windows files into a folder of the distro
+(`~` by default). It runs as your user and never uses `sudo`: if the folder needs
+more permissions, it says so and changes nothing. It asks before overwriting,
+and when you send a `.tar.gz` / `.zip` it offers to extract it there, which
+restores a backup in place.
+
 ### Distros managed by other tools
 
 Distros created by **Docker Desktop** (`docker-desktop`, `docker-desktop-data`),
@@ -98,6 +123,8 @@ applies it: restarting the distro or running `wsl --shutdown`.
 |---|---|---|
 | `wslManager.clickAction` | `expand` | What clicking a distro does: `expand` (details), `terminal`, `window`, or `none`. |
 | `wslManager.showManagedDistros` | `true` | Show Docker Desktop, Podman, and Rancher Desktop distros. |
+| `wslManager.backupFolder` | `""` | Where backups go first. Empty = the Windows Desktop. |
+| `wslManager.backupExcludes` | `node_modules`, `.venv`, ... | Names left out of backups, at any depth. |
 | `wslManager.metricsIntervalSeconds` | `2` | CPU/memory sampling interval for an expanded distro. |
 | `wslManager.autoRefreshSeconds` | `10` | Automatic refresh while the view is visible. `0` disables it. |
 | `wslManager.defaultUser` | `""` | User for opened terminals. Empty = the distro's default. |

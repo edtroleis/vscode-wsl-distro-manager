@@ -167,6 +167,18 @@
         "icon": "$(folder-opened)"
       },
       {
+        "command": "wslManager.backup",
+        "title": "%command.backup%",
+        "category": "WSL Distro Manager",
+        "icon": "$(archive)"
+      },
+      {
+        "command": "wslManager.sendFiles",
+        "title": "%command.sendFiles%",
+        "category": "WSL Distro Manager",
+        "icon": "$(cloud-upload)"
+      },
+      {
         "command": "wslManager.setVersion",
         "title": "%command.setVersion%",
         "category": "WSL Distro Manager"
@@ -306,6 +318,16 @@
           "command": "wslManager.compact",
           "when": "view == wslManager.distros && viewItem == wslVhdx",
           "group": "inline"
+        },
+        {
+          "command": "wslManager.backup",
+          "when": "view == wslManager.distros && viewItem =~ /^wslDistro\\.(running|stopped)$/",
+          "group": "5_files@1"
+        },
+        {
+          "command": "wslManager.sendFiles",
+          "when": "view == wslManager.distros && viewItem =~ /^wslDistro\\.(running|stopped)$/",
+          "group": "5_files@2"
         }
       ]
     },
@@ -328,6 +350,26 @@
           "default": 2,
           "minimum": 1,
           "markdownDescription": "%config.metricsIntervalSeconds%"
+        },
+        "wslManager.backupFolder": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "%config.backupFolder%"
+        },
+        "wslManager.backupExcludes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "node_modules",
+            ".venv",
+            "venv",
+            "__pycache__",
+            ".cache",
+            "target"
+          ],
+          "markdownDescription": "%config.backupExcludes%"
         },
         "wslManager.defaultUser": {
           "type": "string",

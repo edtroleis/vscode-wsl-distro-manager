@@ -52,6 +52,8 @@ Windows host.
 - [ ] *Edit .wslconfig* opens `%USERPROFILE%\.wslconfig`; saving offers `wsl --shutdown`.
 - [ ] *Export* suggests `C:\Users\<you>\<distro>.tar`, shows progress, and produces the file; cancelling it removes the partial file.
 - [ ] *Install Distro...* lists the online catalog; installing one with a custom name works, and *Open Terminal* finishes its setup (default user). Cancelling leaves nothing registered.
+- [ ] *Back Up Folders...* lists the home folder, saves `<distro>-backup-<date>.tar.gz` to the real Desktop (OneDrive too), leaves out `node_modules`, and *Show in Folder* opens it. With `.zip` and zip missing, it says so.
+- [ ] *Send Files to Distro...* copies to `~`; to `/root` it reports no permission and changes nothing; sending an existing name asks to overwrite or skip; sending a backup offers *Extract Here*, which restores it.
 - [ ] *Move to Another Folder...* on a spare distro moves its VHDX (check *Location*) and it still starts; with a window connected to WSL it refuses without changes.
 - [ ] *Import* of that file under a new name creates a working distro; *Unregister* removes it.
 - [ ] *Compact Disk* on a distro you can spare:
