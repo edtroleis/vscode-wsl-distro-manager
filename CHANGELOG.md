@@ -6,7 +6,7 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.1.0]
+## [1.0.0] - 2026-09-23
 
 First release.
 
@@ -49,5 +49,5 @@ First release.
   lose configuration actions, and warn before being stopped or unregistered.
 - Backups and sent files run as the distro's default user and never use `sudo`.
 
-[Unreleased]: https://github.com/edtroleis/vscode-wsl-distro-manager/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/edtroleis/vscode-wsl-distro-manager/releases/tag/v0.1.0
+[Unreleased]: https://github.com/edtroleis/vscode-wsl-distro-manager/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/edtroleis/vscode-wsl-distro-manager/releases/tag/v1.0.0
