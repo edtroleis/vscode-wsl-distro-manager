@@ -147,7 +147,8 @@ exporting the whole distro:
    - Click its **➔** to open it and choose the folders and files inside. There,
      *Everything in ...* takes the whole folder again, and *Back to ...* (or
      **←** in the title) returns to the folder above.
-   - Choose *Type paths...* to enter paths relative to your home, or absolute.
+   - Choose *Type paths...* to enter paths relative to your home (`projects/app`
+     or `~/projects/app`), or absolute (`/etc/nginx`).
 
    Choices in every folder are kept until you click **OK**.
 2. Choose the format. `.tar.gz` is recommended: it keeps Linux permissions and

@@ -179,8 +179,8 @@ export class GlobalItem extends vscode.TreeItem {
 }
 
 /**
- * The .wslconfig row: what is set, at a glance; a click opens the file. While
- * a saved change waits for WSL to restart, the row says so and offers the
+ * The .wslconfig row; a click opens the file and the tooltip lists what is set.
+ * While a saved change waits for WSL to restart, the row says so and offers the
  * restart inline.
  */
 export function wslConfigItem(

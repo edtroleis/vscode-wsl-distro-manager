@@ -6,6 +6,23 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.0.4] - 2026-09-24
+
+### Changed
+
+- The *Settings (.wslconfig)* row is now *.wslconfig*, and its values (such as
+  `memory` and `processors`) moved to its tooltip. The row shows only
+  *restart WSL to apply* or *not created* when that applies.
+
+### Fixed
+
+- *Back Up Folders*: typed paths starting with `~` (such as `~/.ssh`) failed,
+  because no shell expands `~`. They are now read as relative to your home.
+- Live metrics: two VS Code windows taking over from a closed one could both
+  start sampling the same distro.
+- After a distro stops, Windows interop is checked once, not once for the
+  command and again for the next refresh.
+
 ## [0.0.3] - 2026-09-24
 
 ### Added
@@ -33,9 +50,6 @@ project follows [Semantic Versioning](https://semver.org/).
 - The gear in the view's title bar opens the extension's settings. The global
   `.wslconfig` opens from its row under the **WSL** node, or with
   *Edit .wslconfig (Global)* in the Command Palette.
-- The *Settings (.wslconfig)* row is now *.wslconfig*, and its values (such as
-  `memory` and `processors`) moved to its tooltip. The row shows only
-  *restart WSL to apply* or *not created* when that applies.
 
 ## [0.0.2] - 2026-09-24
 

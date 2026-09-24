@@ -3,6 +3,7 @@ import { promptPassword } from './prompts';
 import * as wsl from './wsl';
 
 let noticeOpen = false;
+let checking = false;
 
 /**
  * WSL removes Windows interop from every running distro when one stops. The
@@ -10,9 +11,19 @@ let noticeOpen = false;
  * through the distro's sudo, and only after the user agrees.
  */
 export async function offerInteropRepair(running?: string[]): Promise<void> {
-	if (noticeOpen) {
+	// A Stop both runs this and shows up in the next refresh: check once.
+	if (noticeOpen || checking) {
 		return;
 	}
+	checking = true;
+	try {
+		await checkAndOffer(running);
+	} finally {
+		checking = false;
+	}
+}
+
+async function checkAndOffer(running?: string[]): Promise<void> {
 	const names = running ?? (await wsl.list()).filter((d) => d.running).map((d) => d.name);
 	// WSL removes the entry a few seconds after the distro stops, not at once:
 	// look again for a while (as the default user, so it is cheap and harmless).

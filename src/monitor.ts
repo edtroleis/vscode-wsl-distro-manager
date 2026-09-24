@@ -222,7 +222,22 @@ export class DistroMonitor implements vscode.Disposable {
 			return;
 		}
 		let lastChange = Date.now();
+		// A takeover checks that the distro runs (a wsl.exe call), which can take
+		// longer than the interval; overlapping polls could then both take over
+		// and start two samplers.
+		let polling = false;
 		const poll = async () => {
+			if (polling) {
+				return;
+			}
+			polling = true;
+			try {
+				await pollOnce();
+			} finally {
+				polling = false;
+			}
+		};
+		const pollOnce = async () => {
 			const line = await fs.readFile(paths.sample, 'utf8').catch(() => undefined);
 			if (generation !== this.generation) {
 				return;

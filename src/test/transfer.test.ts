@@ -11,6 +11,7 @@ import {
 	isWithin,
 	normalizeSelection,
 	parseExcludes,
+	parseTypedPaths,
 	sensitivePaths,
 	updateSelection,
 } from '../transfer';
@@ -180,5 +181,11 @@ describe('sensitivePaths with the whole home folder', () => {
 
 	it('says nothing when the home folder has none', () => {
 		assert.deepEqual(sensitivePaths(['.'], ['.bashrc', 'code']), []);
+	});
+});
+
+describe('parseTypedPaths', () => {
+	it('turns ~ into paths relative to home, since no shell expands it', () => {
+		assert.deepEqual(parseTypedPaths(' ~/.ssh, projects/app ,/etc/nginx, ~ ,'), ['.ssh', 'projects/app', '/etc/nginx', '.']);
 	});
 });

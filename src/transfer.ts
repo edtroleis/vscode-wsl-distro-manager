@@ -97,6 +97,18 @@ export function sameKeys(a: string[], b: string[]): boolean {
 	return a.length === b.length && a.every((k) => b.includes(k));
 }
 
+/**
+ * Typed paths, separated by commas. The archiver runs without a shell, which
+ * would expand "~", so "~" and "~/x" become the home-relative "." and "x".
+ */
+export function parseTypedPaths(input: string): string[] {
+	return input
+		.split(',')
+		.map((p) => p.trim())
+		.filter(Boolean)
+		.map((p) => (p === '~' || p === '~/' ? '.' : p.startsWith('~/') ? p.slice(2) : p));
+}
+
 /** Drops paths already covered by a selected folder above them. */
 export function normalizeSelection(paths: string[]): string[] {
 	const unique = [...new Set(paths)];
@@ -598,7 +610,7 @@ export async function pickHomePaths(
 		if (answer === undefined) {
 			return undefined;
 		}
-		paths.push(...answer.split(',').map((p) => p.trim()).filter(Boolean));
+		paths.push(...parseTypedPaths(answer));
 	}
 	return { paths: normalizeSelection(paths), homeNames };
 }

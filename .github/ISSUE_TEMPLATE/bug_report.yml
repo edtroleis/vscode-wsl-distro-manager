@@ -28,7 +28,7 @@ body:
     attributes:
       label: Extension version
       description: Run **About** from the view's `...` menu.
-      placeholder: "0.0.3"
+      placeholder: "x.y.z"
     validations:
       required: true
   - type: textarea
