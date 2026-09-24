@@ -13,7 +13,9 @@ project follows [Semantic Versioning](https://semver.org/).
 - A **WSL** node at the top of the view for what applies to all distros: the
   global `.wslconfig`, with its main settings summarized (memory, processors,
   swap, networking mode, ...), and the WSL and kernel versions.
-- **Restart WSL** command: stops WSL and starts the running distros again.
+- **Restart WSL** command: stops WSL and starts again only the distros that
+  were running (not Docker, Podman, or Rancher ones). It runs from a local
+  VS Code window, since from inside WSL it would stop the extension itself.
 - Saving `.wslconfig` explains that the change applies after WSL restarts
   (not Windows) and offers the restart; until then, the WSL node shows the
   change as pending, detected from the VM's uptime.
@@ -53,16 +55,14 @@ project follows [Semantic Versioning](https://semver.org/).
   hidden.
 - Compaction could fail on a VHDX path with accented characters; it now passes
   `diskpart` the short (8.3) path.
-- *Restart WSL* run from inside WSL would stop the extension before it started
-  the distros again; it now asks to run it from a local window.
 - *Start* ignored `wslManager.wslExePath` for the session that keeps the distro
   running.
 - *Copy Name* gave no feedback; it now confirms in the status bar.
 
 ### Removed
 
-- Converting a distro between WSL 1 and WSL 2. Use `wsl --set-version <distro> <1|2>`
-  in a terminal if you need it.
+- Converting a distro between WSL 1 and WSL 2. Use
+  `wsl --set-version <distro> <1|2>` in a terminal if you need it.
 - Editing a distro's `/etc/wsl.conf`. WSL lets your Windows account enter any
   distro as root without a password, so the extension saved system files with
   no `sudo` prompt at all; a mistake there can keep a distro from starting.

@@ -44,13 +44,15 @@ themselves.
   cancel.
 
 **Stay safe**
-- Nothing shuts WSL down while VS Code windows are connected to it; actions
-  that would disconnect a window are refused or confirmed explicitly.
+- Compacting and moving never shut WSL down while VS Code windows are
+  connected to it; *Restart WSL* and *Shut Down WSL* name the windows that will
+  disconnect before you confirm.
 - Distros owned by Docker Desktop, Podman, or Rancher Desktop are labeled and
   protected.
 - Nothing runs as root without you: the only privileged step inside a distro,
   repairing Windows interop, goes through its `sudo` after you agree (see
   [Security](#security)).
+- Backups that include credentials (`.ssh`, `.aws`, ...) ask first.
 - Destructive actions ask first; unregistering requires typing the distro name.
 
 **Control and organize**
@@ -139,7 +141,10 @@ exporting the whole distro:
    to OneDrive), the folder in `wslManager.backupFolder`, or any other folder.
 
 The backup runs inside the distro as your user. Files you cannot read are left
-out, and the result tells you so.
+out, and the result tells you so. The archive is not encrypted: if it includes
+folders that usually hold credentials (`.ssh`, `.aws`, `.kube`, `.gnupg`, ...),
+the extension asks first, and says when the destination is synced to the
+cloud.
 
 To restore, use **Send Files to Distro...**, send the archive to the folder it
 came from (usually `~`), and choose **Send and extract**.
@@ -150,7 +155,7 @@ came from (usually `~`), and choose **Send and extract**.
 distro, `~` by default. It runs as your user and never uses `sudo`: if the
 folder needs more permissions, it says so and changes nothing. Before copying,
 it asks whether to overwrite or skip files that already exist, and whether to
-extract `.tar.gz` or `.zip` archives.
+extract `.tar.gz` or `.zip` archives. Extract only archives you trust.
 
 ### Install, move, export, and import
 
@@ -191,7 +196,8 @@ warns first, because doing it from here can break that tool. Set
   which closes every WSL terminal. The extension refuses while VS Code windows
   are connected to WSL rather than disconnect them.
 - **Memory is an estimate.** It adds up the memory of each process, so memory
-  shared between processes counts more than once.
+  shared between processes counts more than once, and a distro can show more
+  than the whole VM uses. Measuring it exactly would need root.
 - **Started distros keep running** until you stop them, even after VS Code
   closes. This is what *Start* is for, but it keeps the WSL VM using memory.
 - **Live metrics keep an expanded distro running.** Collapse it, or hide the

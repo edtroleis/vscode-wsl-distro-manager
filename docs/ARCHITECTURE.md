@@ -9,8 +9,10 @@ Windows 11); each section says what goes wrong without the workaround.
 | File | Responsibility |
 |---|---|
 | [`src/extension.ts`](../src/extension.ts) | Activation: registers the view, the commands, and the `wsl-config:` file system; offers to apply config changes on save. |
-| [`src/tree.ts`](../src/tree.ts) | The sidebar tree: distro rows, expandable details, the VHDX row, refresh timer, interop healing. |
-| [`src/commands.ts`](../src/commands.ts) | Lifecycle, export/import, install, move, compaction, and their confirmations. |
+| [`src/tree.ts`](../src/tree.ts) | The sidebar tree: the WSL node, distro rows, expandable details, the VHDX row, the refresh timer. |
+| [`src/commands.ts`](../src/commands.ts) | Lifecycle, Restart WSL, export/import, install, move, compaction, and their confirmations. |
+| [`src/interop.ts`](../src/interop.ts) | Detecting lost Windows interop and repairing it through `sudo`, with consent. |
+| [`src/pending.ts`](../src/pending.ts) | Tracking a saved `.wslconfig` until WSL restarts. |
 | [`src/transfer.ts`](../src/transfer.ts) | Folder backups and sending files into a distro. |
 | [`src/monitor.ts`](../src/monitor.ts) | Live CPU and memory, shared between VS Code windows. |
 | [`src/wsl.ts`](../src/wsl.ts) | Everything that runs `wsl.exe`, `reg.exe`, PowerShell, or `diskpart`, plus the parsers for their output. |
@@ -33,7 +35,7 @@ Paths and programs differ between the two hosts:
 
 | | Windows host | Inside WSL |
 |---|---|---|
-| `wsl.exe`, `reg.exe`, PowerShell | on the `PATH` | `/mnt/c/Windows/System32/...`, through interop |
+| `wsl.exe`, `reg.exe`, PowerShell | `%SystemRoot%\System32\...`, by absolute path | `/mnt/c/Windows/System32/...`, through interop |
 | Windows folders (`%USERPROFILE%`, `%TEMP%`) | `os.homedir()`, `os.tmpdir()` | `cmd.exe /c echo %VAR%` + `wslpath -u` |
 | Paths returned by file dialogs | Windows paths | Linux paths, converted with `wslpath -w` before `wsl.exe` sees them |
 
@@ -106,11 +108,12 @@ waits for Windows to be able to open the file exclusively, and otherwise asks
 to shut WSL down, restarting the distros that were running afterwards (except
 Docker, Podman, and Rancher ones, which their tools must start).
 
-**Shutdowns never disconnect VS Code windows.** A shutdown kills every VS Code
-window connected to WSL, and those windows retried while WSL was down and then
-gave up. Before any of this starts, the extension looks for `wsl.exe`
-processes running the VS Code server; if there are any, it refuses and changes
-nothing.
+**Compaction and moving never disconnect VS Code windows.** A shutdown kills
+every VS Code window connected to WSL, and in testing those windows retried
+while WSL was down for `diskpart` and then gave up. Before compacting or moving,
+the extension looks for `wsl.exe` processes running the VS Code server; if
+there are any, it refuses and changes nothing. *Restart WSL* and *Shut Down
+WSL* exist to stop WSL, so they only warn, naming the connected distros.
 
 **Compaction** runs `diskpart` (`attach vdisk readonly`, `compact vdisk`)
 elevated through `Start-Process -Verb RunAs`. The commands travel inside the
@@ -166,7 +169,7 @@ the save, the flag clears. Uptime is a duration, so the VM clock drift does
 not matter. With no distro running the extension cannot tell whether the VM is
 still up, so the flag stays.
 
-## Files inside distros
+## Privileges
 
 **No root without consent.** WSL lets the Windows account enter any distro as
 root with `wsl -u root` and no password, bypassing the distro's `sudo` rules.
@@ -177,8 +180,20 @@ agrees: `sudo -n` first, which succeeds only if the distro allows it without a
 password, then `sudo -S` with the password on standard input. A default user
 that is root writes directly, as it would in its own terminal.
 
+**Programs by absolute path.** Windows programs are started from `System32`
+by full path (`system32()`), and the elevated chain names PowerShell and
+`diskpart` through `$env:SystemRoot`. A bare name would let a same-named
+program earlier in the `PATH` run instead, with administrator rights in the
+elevated case. (The current Node runtime does not search the working folder
+first, which was checked; this is defense in depth.)
+
+## Files inside distros
+
 **Backups and sent files run as the default user.** Archivers run with
 `wsl --cd ~ --exec`, so no shell parses paths or patterns. Folder permissions
 are checked before copying; a folder that would need `sudo` is refused. File
 dialogs cannot browse `\\wsl.localhost` (VS Code blocks UNC hosts), so folders
 inside a distro are picked from a list of the home folder or typed.
+A backup is an unencrypted archive, so one that includes folders usually
+holding credentials (`.ssh`, `.aws`, `.kube`, ...) asks first, and says when the
+destination is synced to the cloud (a Desktop in OneDrive, for example).
