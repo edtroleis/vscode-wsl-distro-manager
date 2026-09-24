@@ -89,6 +89,7 @@
   "Choose a folder...": "Escolher uma pasta...",
   "Where to save the backup": "Onde salvar o backup",
   "Choose a folder on a Windows drive.": "Escolha uma pasta em uma unidade do Windows.",
+  "Confirm": "Confirmar",
   "{0} written, {1}": "{0} gravados, {1}",
   "starting, {0}": "iniciando, {0}",
   "waiting...": "aguardando...",

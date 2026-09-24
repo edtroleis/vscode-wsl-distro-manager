@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { formatBytes } from './monitor';
 import { withFileProgress, withProgress } from './progress';
+import { promptText } from './prompts';
 import * as wsl from './wsl';
 import { Distro } from './wsl';
 
@@ -99,7 +100,7 @@ export function registerTransferCommands(register: Register, resolveDistro: Reso
 		}
 
 		const configured = vscode.workspace.getConfiguration('wslManager').get<string[]>('backupExcludes', DEFAULT_BACKUP_EXCLUDES);
-		const excludesInput = await vscode.window.showInputBox({
+		const excludesInput = await promptText({
 			title: vscode.l10n.t('Leave out folders and files named'),
 			prompt: vscode.l10n.t('Separated by commas or spaces, matched at any depth. Empty to include everything.'),
 			value: configured.join(', '),
@@ -162,7 +163,7 @@ export function registerTransferCommands(register: Register, resolveDistro: Reso
 		if (!files || files.length === 0) {
 			return;
 		}
-		const target = await vscode.window.showInputBox({
+		const target = await promptText({
 			title: vscode.l10n.t('Folder in {0}', distro.name),
 			prompt: vscode.l10n.t('~ is your home. It must be a folder your user can write to; nothing runs with sudo.'),
 			value: '~',
@@ -290,7 +291,7 @@ async function pickHomePaths(distro: Distro): Promise<string[] | undefined> {
 	}
 	const paths = picked.filter((p) => !p.typed).map((p) => (p as { name: string }).name);
 	if (picked.some((p) => p.typed)) {
-		const typed = await vscode.window.showInputBox({
+		const typed = await promptText({
 			title: vscode.l10n.t('Paths to back up'),
 			prompt: vscode.l10n.t('Separated by commas, relative to your home (projects/app) or absolute (/etc/nginx).'),
 		});

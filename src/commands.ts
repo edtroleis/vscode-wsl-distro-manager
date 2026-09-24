@@ -5,6 +5,7 @@ import * as wsl from './wsl';
 import { Distro } from './wsl';
 import { formatBytes } from './monitor';
 import { formatElapsed, withFileProgress, withProgress } from './progress';
+import { promptText } from './prompts';
 import { registerTransferCommands } from './transfer';
 import { DistroItem, DistroTreeProvider, InfoItem, estimateReclaimable } from './tree';
 import { distroUri, globalUri } from './configFs';
@@ -470,7 +471,7 @@ export function registerCommands(
 		const sourcePath = await wsl.toWindowsPath(source);
 
 		const existing = new Set((await wsl.list()).map((d) => d.name.toLowerCase()));
-		const name = await vscode.window.showInputBox({
+		const name = await promptText({
 			title: vscode.l10n.t('Name of the new distro'),
 			value: path.win32.parse(sourcePath).name,
 			validateInput: (value) => {
@@ -538,7 +539,7 @@ export function registerCommands(
 			return;
 		}
 		// Unregister deletes the whole disk and cannot be undone: require typing the name.
-		const typed = await vscode.window.showInputBox({
+		const typed = await promptText({
 			title: vscode.l10n.t('Permanently unregister "{0}"', distro.name),
 			prompt: [
 				vscode.l10n.t('This deletes ALL data in "{0}".', distro.name),
@@ -778,7 +779,7 @@ export function registerCommands(
 		if (!picked) {
 			return;
 		}
-		const name = await vscode.window.showInputBox({
+		const name = await promptText({
 			title: vscode.l10n.t('Name for the new {0}', picked.distro.friendlyName),
 			value: installed.has(picked.distro.name.toLowerCase()) ? `${picked.distro.name}-2` : picked.distro.name,
 			validateInput: (value) => {
