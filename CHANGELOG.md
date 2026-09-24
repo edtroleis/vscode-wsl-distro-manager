@@ -6,6 +6,13 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.0.2] - 2026-09-24
+
+### Fixed
+
+- *Back Up Folders*: clicking a folder or a file did not keep it checked. A
+  checked folder is backed up whole, without opening it.
+
 ## [0.0.1] - 2026-09-24
 
 First release.
@@ -58,5 +65,6 @@ First release.
 - Backups and sent files run as the distro's default user, and backups that
   include folders usually holding credentials ask first.
 
-[Unreleased]: https://github.com/edtroleis/vscode-wsl-distro-manager/compare/v0.0.1...HEAD
+[Unreleased]: https://github.com/edtroleis/vscode-wsl-distro-manager/compare/v0.0.2...HEAD
+[0.0.2]: https://github.com/edtroleis/vscode-wsl-distro-manager/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/edtroleis/vscode-wsl-distro-manager/releases/tag/v0.0.1
