@@ -68,6 +68,11 @@ Then run **Developer: Reload Window**.
 - [ ] **Restart WSL** lists the running distros, stops WSL, and starts again only those that were running (not Podman/Docker ones); stopped distros stay stopped, and the pending mark disappears.
 - [ ] Collapsing the **WSL** node keeps it collapsed across refreshes.
 
+### Title bar and support
+- [ ] The title bar shows Refresh, the gear, and Shut Down WSL; the gear opens Settings filtered to this extension.
+- [ ] *About* in the `...` menu shows the installed version; its buttons open the extension page, the changelog, and a new issue.
+- [ ] **View > Output > Distro Manager for WSL** starts with the version, and a backup logs each click in the list.
+
 ### Install, export, import, move
 - [ ] *Install Distro...* lists the online catalog. Installing one under a custom name works, and *Open Terminal* finishes its setup. Cancelling leaves nothing registered.
 - [ ] *Export* suggests `C:\Users\<you>\<distro>.tar`, shows progress, and creates the file. Cancelling removes the partial file.

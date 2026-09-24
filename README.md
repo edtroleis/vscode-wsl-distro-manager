@@ -23,6 +23,12 @@ themselves.
 > endorsed by, or supported by Microsoft. Windows, Windows Subsystem for Linux,
 > WSL, and Visual Studio Code are trademarks of Microsoft Corporation.
 
+**Contents:** [Features](#features) · [Requirements](#requirements) ·
+[Getting started](#getting-started) · [Guides](#guides) ·
+[Commands](#commands) · [Settings](#settings) ·
+[Known limitations](#known-limitations) · [Troubleshooting](#troubleshooting) ·
+[Security](#security) · [Privacy](#privacy) · [Support](#support)
+
 ## Features
 
 **Watch every distro**
@@ -55,6 +61,8 @@ themselves.
 - Nothing runs as root without you: the only privileged step inside a distro,
   repairing Windows interop, goes through its `sudo` after you agree (see
   [Security](#security)).
+- Lost Windows interop ("Exec format error" after another distro stops) is
+  detected, and repaired with your consent.
 - Backups that include credentials (`.ssh`, `.aws`, ...) ask first.
 - Destructive actions ask first; unregistering requires typing the distro name.
 
@@ -64,14 +72,11 @@ themselves.
 - Open a terminal, or a new VS Code window connected to the distro.
 - Install distros from the official online catalog, with the name and location
   you choose, and move a distro's disk to another folder or drive.
-- Set the default distro, restart WSL, or shut it down.
+- Set the default distro, restart WSL, or shut it down. *Restart WSL* starts
+  again only the distros that were running.
 - Edit the global `.wslconfig` from the **WSL** node at the top of the view,
   which also summarizes its main settings and shows the WSL and kernel
-  versions. Changes apply only after WSL restarts (Windows does not need to):
-  on save, the extension offers **Restart WSL**, which stops WSL and starts the
-  running distros again, and flags the change as pending until it applies.
-  Distro system files such as `/etc/wsl.conf` are left to `sudo` inside the
-  distro.
+  versions. See [Configure WSL](#configure-wsl-wslconfig).
 
 Every action is one right-click away:
 
@@ -92,6 +97,10 @@ Every action is one right-click away:
 3. Click a distro to expand it. Right-click it for every action, or use the
    buttons on its row. The **WSL** node at the top holds what applies to all
    distros: the global `.wslconfig` and the WSL version.
+
+The view's title bar has **Refresh**, **Extension Settings** (the gear), and
+**Shut Down WSL**; its `...` menu has *Install Distro*, *Import Distro*,
+*Repair Windows Interop*, and *About*.
 
 Every action is also in the Command Palette (`Ctrl+Shift+P`), under
 **Distro Manager for WSL**.
@@ -133,12 +142,14 @@ disk takes a few minutes; the notification shows the elapsed time.
 **Back Up Folders...** archives the folders and files you choose, without
 exporting the whole distro:
 
-1. Choose what to include, starting in your home folder. Check a folder to take
-   all of it, or click its **➔** to open it and choose the folders and files
-   inside; there, *Everything in ...* takes the whole folder again, and
-   *Back to ...* (or **←** in the title) returns to the folder above. Choices in
-   every folder are kept until **OK**. You
-   can also type paths (relative to your home, or absolute).
+1. Choose what to include, starting in your home folder:
+   - Check a folder to take all of it, without opening it.
+   - Click its **➔** to open it and choose the folders and files inside. There,
+     *Everything in ...* takes the whole folder again, and *Back to ...* (or
+     **←** in the title) returns to the folder above.
+   - Choose *Type paths...* to enter paths relative to your home, or absolute.
+
+   Choices in every folder are kept until you click **OK**.
 2. Choose the format. `.tar.gz` is recommended: it keeps Linux permissions and
    symbolic links. `.zip` opens anywhere but loses them, so restored scripts are
    no longer executable.
@@ -175,6 +186,21 @@ extract `.tar.gz` or `.zip` archives. Extract only archives you trust.
   export deletes its partial file, and a cancelled import leaves nothing
   behind.
 
+### Configure WSL (.wslconfig)
+
+`%USERPROFILE%\.wslconfig` holds the settings of the WSL VM that every distro
+shares, such as `memory` and `processors`. Click *Settings (.wslconfig)* under
+the **WSL** node to edit it; when the file does not exist yet, it opens with a
+commented template.
+
+The file applies only when WSL restarts, not Windows. On save, the extension
+offers **Restart WSL Now**, which stops WSL and starts again the distros that
+were running, and the row shows *restart WSL to apply* until the change is in
+effect.
+
+Per-distro files such as `/etc/wsl.conf` belong to the distro and need `sudo`;
+edit them inside the distro.
+
 ### Distros managed by other tools
 
 Distros created by **Docker Desktop** (`docker-desktop`, `docker-desktop-data`),
@@ -182,6 +208,28 @@ Distros created by **Docker Desktop** (`docker-desktop`, `docker-desktop-data`),
 Configuration actions are hidden for them, and stopping or unregistering one
 warns first, because doing it from here can break that tool. Set
 `wslManager.showManagedDistros` to `false` to hide them.
+
+## Commands
+
+All commands are in the Command Palette under **Distro Manager for WSL**.
+
+| Command | Where | What it does |
+|---|---|---|
+| Start, Stop | Distro row, context menu | Start keeps the distro running until you stop it. |
+| Restart | Context menu | Stops and starts the distro. |
+| Open Terminal, Open in New VS Code Window | Distro row, context menu | New window needs Microsoft's WSL extension. |
+| Set as Default Distro | Context menu | Same as `wsl --set-default`. |
+| Export (Backup)... | Context menu | The whole distro as `.tar` or `.vhdx`, with progress and cancel. |
+| Import Distro... | `...` menu | From a `.tar` or `.vhdx`, under the name and folder you choose. |
+| Install Distro... | `...` menu | From the official online catalog. |
+| Compact Disk..., Move to Another Folder... | Context menu, VHDX row | Need the disk released; see [Reclaim disk space](#reclaim-disk-space). |
+| Back Up Folders..., Send Files to Distro... | Context menu | Run as your user; see the [guide](#back-up-folders-and-restore-them). |
+| Unregister Distro... | Context menu | Deletes the distro and its disk; asks you to type its name. |
+| Copy Name | Context menu | Copies the distro name. |
+| Edit .wslconfig (Global), Restart WSL | WSL node | See [Configure WSL](#configure-wsl-wslconfig). |
+| Shut Down WSL | Title bar, WSL node | `wsl --shutdown`, after naming the windows it disconnects. |
+| Repair Windows Interop | `...` menu | Through `sudo`, after you agree. |
+| Refresh, Extension Settings, About | Title bar, `...` menu | About shows the version and links to the changelog and issues. |
 
 ## Settings
 
@@ -243,14 +291,6 @@ Copy the `.vsix` to a Windows folder first.
 If `wsl.exe` is not on the `PATH`, set `wslManager.wslExePath`. With no distro
 installed, the view offers *Install Distro* and *Import Distro* instead.
 
-**Which version is installed?** Run **About** from the view's `...` menu. It
-also opens the extension page, the changelog, and a new issue.
-
-**Something else goes wrong.** Open **View > Output** and choose
-*Distro Manager for WSL*. The log starts with the extension's version and lists
-what the extension did (for example each click in the backup list), never
-passwords or file contents; include it when you [report an issue](https://github.com/edtroleis/vscode-wsl-distro-manager/issues).
-
 ## Security
 
 - **No root without your consent.** WSL lets your Windows account enter any
@@ -285,8 +325,7 @@ passwords or file contents; include it when you [report an issue](https://github
 - **Release pipeline.** CI runs with a read-only token; the release job alone
   can write, and GitHub Actions are pinned to commit hashes.
 
-Report security issues privately through GitHub's
-[security advisories](https://github.com/edtroleis/vscode-wsl-distro-manager/security/advisories/new).
+Report security issues privately, as described in [SECURITY.md](SECURITY.md).
 
 ## Privacy
 
@@ -295,6 +334,17 @@ a distro and listing the catalog go through `wsl.exe`, which downloads from
 Microsoft. Live metrics are shared between VS Code windows through files in
 `%TEMP%\wsl-distro-manager`.
 
+## Support
+
+- **Questions and bugs:** [open an issue](https://github.com/edtroleis/vscode-wsl-distro-manager/issues/new/choose).
+  The form asks for the extension, WSL, and Windows versions, and the log.
+- **Version:** run **About** from the view's `...` menu.
+- **Log:** open **View > Output** and choose *Distro Manager for WSL*. It
+  starts with the extension's version and lists what the extension did (for
+  example each click in the backup list), never passwords or file contents.
+- **Security issues:** report them privately; see [SECURITY.md](SECURITY.md).
+- **Changes:** see the [changelog](CHANGELOG.md).
+
 ## Languages
 
 English and Brazilian Portuguese. The extension follows the VS Code display
@@ -302,8 +352,7 @@ language (**Configure Display Language**).
 
 ## Contributing
 
-Bug reports and pull requests are welcome on
-[GitHub](https://github.com/edtroleis/vscode-wsl-distro-manager/issues). See
+Bug reports, ideas, and pull requests are welcome. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup, and
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the extension works
 around WSL's quirks.

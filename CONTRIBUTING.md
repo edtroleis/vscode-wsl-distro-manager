@@ -98,8 +98,11 @@ translation is missing or has different placeholders, and CI fails if
    ```
 
 5. Update the README when behavior visible to users changes.
-6. Open the pull request with a description of the problem and how you tested
-   the fix. Merge it when CI passes.
+6. Open the pull request; its template lists what to describe and check.
+   Merge it when CI passes.
+
+Report bugs and ideas with the [issue forms](https://github.com/edtroleis/vscode-wsl-distro-manager/issues/new/choose),
+and vulnerabilities as described in [SECURITY.md](SECURITY.md).
 
 ## Icons
 
