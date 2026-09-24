@@ -141,8 +141,8 @@ two ways.
 #### Option A: Microsoft Entra ID (recommended)
 
 GitHub Actions signs in to Azure with OIDC and gets a short-lived token; no
-secret is stored. It needs an Azure subscription (a free one works; a managed
-identity costs nothing).
+secret is stored. It needs an Azure subscription to hold the managed identity (a
+free one works; the identity costs nothing).
 
 Run the `az` commands in [Azure Cloud Shell](https://portal.azure.com/#cloudshell/)
 (Bash; already signed in), or install the Azure CLI (on Fedora,
@@ -157,7 +157,7 @@ Check the subscription with `az account show`.
    az identity create --name vscode-wsl-distro-manager-publisher --resource-group vscode-publish
    ```
 
-   Note its `clientId`, `tenantId`, and `id` (the resource ID).
+   Note its `clientId` and `tenantId`.
 2. Let this repository's `marketplace` environment sign in as it:
 
    ```bash
@@ -170,16 +170,22 @@ Check the subscription with `az account show`.
      --audiences api://AzureADTokenExchange
    ```
 
-3. At <https://marketplace.visualstudio.com/manage/publishers/edtroleis>,
-   open **Members** and add the identity by its resource ID, with the
-   **Contributor** role.
-4. Store the IDs as variables of the environment (they are not secrets):
+3. Store the IDs as variables of the environment (they are not secrets):
 
    ```bash
-   gh variable set AZURE_CLIENT_ID --env marketplace --body <clientId>
-   gh variable set AZURE_TENANT_ID --env marketplace --body <tenantId>
-   gh variable set AZURE_SUBSCRIPTION_ID --env marketplace --body <subscriptionId>
+   gh variable set AZURE_CLIENT_ID --env marketplace --repo edtroleis/vscode-wsl-distro-manager --body <clientId>
+   gh variable set AZURE_TENANT_ID --env marketplace --repo edtroleis/vscode-wsl-distro-manager --body <tenantId>
    ```
+
+   The identity needs no role in the subscription.
+4. Get the identity's member ID. It is a GUID that only the identity can read
+   (not its name, and not its Azure resource ID), so the **Release** workflow
+   prints it: run it (a push to `main`, or **Run workflow**) and find the
+   notice *Marketplace member ID* in the run summary. Until step 5 is done,
+   that run fails at *Publish*, which changes nothing.
+5. At <https://marketplace.visualstudio.com/manage/publishers/edtroleis>, open
+   **Members**, add that ID with the **Contributor** role, and re-run the
+   failed job.
 
 #### Option B: Azure DevOps token
 

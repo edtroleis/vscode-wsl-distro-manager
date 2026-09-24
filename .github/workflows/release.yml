@@ -49,9 +49,9 @@ jobs:
         run: npx vsce package --out "vscode-wsl-distro-manager-${{ steps.status.outputs.version }}.vsix"
 
       # Two ways to authenticate, see CONTRIBUTING.md > Releases:
-      # - Microsoft Entra ID (recommended): the variables AZURE_CLIENT_ID,
-      #   AZURE_TENANT_ID, and AZURE_SUBSCRIPTION_ID of a managed identity that
-      #   is a member of the publisher. Short-lived credentials, nothing stored.
+      # - Microsoft Entra ID (recommended): the variables AZURE_CLIENT_ID and
+      #   AZURE_TENANT_ID of a managed identity that is a member of the
+      #   publisher. Short-lived credentials, nothing stored.
       # - An organization-scoped Azure DevOps token in the secret VSCE_PAT.
       #   Global tokens stop working on 2026-12-01.
       - name: Sign in to Azure (Entra ID)
@@ -60,7 +60,17 @@ jobs:
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          # The identity needs no role in any subscription, only publisher membership.
+          allow-no-subscriptions: true
+
+      # The ID to add as a member of the publisher (Contributor). It exists only
+      # for the identity itself, so this is where to read it during setup.
+      - name: Marketplace member ID
+        if: steps.status.outputs.published == 'false' && vars.AZURE_CLIENT_ID != ''
+        run: |
+          id=$(az rest -u "https://app.vssps.visualstudio.com/_apis/profile/profiles/me?api-version=7.1-preview.3" \
+            --resource 499b84ac-1321-427f-aa17-267ca6975798 --query id -o tsv)
+          echo "::notice title=Marketplace member ID::$id (a member of the publisher, role Contributor)"
 
       - name: Publish to the Marketplace
         if: steps.status.outputs.published == 'false'
