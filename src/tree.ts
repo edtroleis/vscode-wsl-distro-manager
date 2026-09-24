@@ -13,8 +13,10 @@ import {
 	runtimeInfo,
 	summarizeWslConfig,
 	toHostPath,
+	vmUptime,
 	wslVersion,
 } from './wsl';
+import { clearPending, pendingSince, restartedSince } from './pending';
 
 /**
  * How much a compaction would likely give back, or undefined when it is not
@@ -152,14 +154,32 @@ export class GlobalItem extends vscode.TreeItem {
 	}
 }
 
-/** The .wslconfig row: what is set, at a glance; a click opens the file. */
-export function wslConfigItem(summary: string | undefined, exists: boolean, file: string): vscode.TreeItem {
+/**
+ * The .wslconfig row: what is set, at a glance; a click opens the file. While
+ * a saved change waits for WSL to restart, the row says so and offers the
+ * restart inline.
+ */
+export function wslConfigItem(
+	summary: string | undefined,
+	exists: boolean,
+	file: string,
+	pending = false,
+): vscode.TreeItem {
 	const item = new vscode.TreeItem(vscode.l10n.t('Settings (.wslconfig)'), vscode.TreeItemCollapsibleState.None);
 	item.id = 'global/wslconfig';
-	item.description = summary ?? (exists ? vscode.l10n.t('WSL defaults') : vscode.l10n.t('not created; WSL defaults'));
-	item.tooltip = `${file}\n\n${vscode.l10n.t('Applies to every distro after "wsl --shutdown".')}`;
-	item.iconPath = new vscode.ThemeIcon('gear');
-	item.contextValue = 'wslGlobalConfig';
+	const values = summary ?? (exists ? vscode.l10n.t('WSL defaults') : vscode.l10n.t('not created; WSL defaults'));
+	item.description = pending ? vscode.l10n.t('restart WSL to apply · {0}', values) : values;
+	item.tooltip = [
+		file,
+		'',
+		pending
+			? vscode.l10n.t('Saved changes are not applied yet: restart WSL (not Windows) to apply them.')
+			: vscode.l10n.t('Changes apply to every distro after WSL restarts. Windows does not need to restart.'),
+	].join('\n');
+	item.iconPath = pending
+		? new vscode.ThemeIcon('warning', new vscode.ThemeColor('list.warningForeground'))
+		: new vscode.ThemeIcon('gear');
+	item.contextValue = pending ? 'wslGlobalConfig.pending' : 'wslGlobalConfig';
 	item.command = { command: 'wslManager.editWslConfig', title: vscode.l10n.t('Edit {0}', '.wslconfig') };
 	return item;
 }
@@ -232,12 +252,18 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 			return this.distroChildren(element);
 		}
 		if (element instanceof GlobalItem) {
-			const [config, version] = await Promise.all([
+			const [config, version, pending] = await Promise.all([
 				readWslConfig().catch(() => undefined),
 				wslVersion(),
+				this.stillPending(),
 			]);
 			return [
-				wslConfigItem(config && summarizeWslConfig(config.config), config?.exists ?? false, config?.path ?? '.wslconfig'),
+				wslConfigItem(
+					config && summarizeWslConfig(config.config),
+					config?.exists ?? false,
+					config?.path ?? '.wslconfig',
+					pending,
+				),
 				wslVersionItem(version),
 			];
 		}
@@ -285,6 +311,29 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 			})
 			.catch(() => undefined)
 			.finally(() => (this.restoringInterop = false));
+	}
+
+	/**
+	 * Whether a saved .wslconfig still waits for WSL to restart. A running
+	 * distro tells how long the VM has been up; if it booted after the save,
+	 * the change is applied. With nothing running, it cannot tell, so it stays
+	 * pending (the VM may still be up).
+	 */
+	private async stillPending(): Promise<boolean> {
+		const savedAt = pendingSince();
+		if (savedAt === undefined) {
+			return false;
+		}
+		const running = [...(this.lastRunning ?? [])];
+		if (running.length === 0) {
+			return true;
+		}
+		const uptime = await vmUptime(running[0]).catch(() => undefined);
+		if (uptime !== undefined && restartedSince(savedAt, uptime)) {
+			await clearPending();
+			return false;
+		}
+		return true;
 	}
 
 	/** Drops the details cache; used by the manual refresh. */

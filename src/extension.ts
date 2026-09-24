@@ -1,9 +1,11 @@
 import * as vscode from 'vscode';
 import { SCHEME, WslConfigFileSystem } from './configFs';
 import { registerCommands } from './commands';
+import { initPending, markPending } from './pending';
 import { DistroTreeProvider } from './tree';
 
 export function activate(context: vscode.ExtensionContext): void {
+	initPending(context);
 	context.subscriptions.push(
 		vscode.workspace.registerFileSystemProvider(SCHEME, new WslConfigFileSystem(), {
 			isCaseSensitive: true,
@@ -29,21 +31,25 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 /**
- * .wslconfig does not take effect until the WSL VM restarts, so offer that on
- * save. Only the global .wslconfig is served by the wsl-config: scheme.
+ * .wslconfig takes effect only when the WSL VM restarts, not Windows. Say so on
+ * save, offer the restart, and flag the change as pending in the WSL node
+ * until it is applied. Only the global .wslconfig is served by wsl-config:.
  */
 async function onConfigSaved(document: vscode.TextDocument): Promise<void> {
 	if (document.uri.scheme !== SCHEME) {
 		return;
 	}
-	// The WSL node summarizes .wslconfig: show the new values right away.
+	await markPending();
 	void vscode.commands.executeCommand('wslManager.refresh');
-	const choice = await vscode.window.showInformationMessage(
-		vscode.l10n.t('.wslconfig saved. Run "wsl --shutdown" to apply it?'),
-		vscode.l10n.t('Shut Down WSL'),
+	const restart = vscode.l10n.t('Restart WSL Now');
+	const choice = await vscode.window.showWarningMessage(
+		vscode.l10n.t(
+			'.wslconfig saved. The changes take effect only after WSL restarts (every distro stops and starts again). Windows does not need to restart.',
+		),
+		restart,
 	);
-	if (choice) {
-		await vscode.commands.executeCommand('wslManager.shutdown');
+	if (choice === restart) {
+		await vscode.commands.executeCommand('wslManager.restartWsl');
 	}
 }
 

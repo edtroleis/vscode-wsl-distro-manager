@@ -6,6 +6,7 @@ import { Distro } from './wsl';
 import { formatBytes } from './monitor';
 import { formatElapsed, withFileProgress, withProgress } from './progress';
 import { promptText } from './prompts';
+import { clearPending } from './pending';
 import { registerTransferCommands } from './transfer';
 import { DistroItem, DistroTreeProvider, InfoItem, estimateReclaimable } from './tree';
 import { globalUri } from './configFs';
@@ -558,7 +559,51 @@ export function registerCommands(
 			return;
 		}
 		await withProgress(vscode.l10n.t('Shutting down WSL...'), () => wsl.shutdown());
+		// The VM stopped, so a saved .wslconfig applies when it starts again.
+		await clearPending();
 		tree.refresh();
+	});
+
+	register('wslManager.restartWsl', async () => {
+		const running = (await wsl.list()).filter((d) => d.running).map((d) => d.name);
+		const toStart = running.filter((name) => !wsl.managedBy(name));
+		const managed = running.filter((name) => wsl.managedBy(name));
+		const connected = await wsl.vscodeConnectedDistros().catch(() => []);
+		const detail = [
+			running.length > 0
+				? vscode.l10n.t('Running now: {0}. They stop and start again.', running.join(', '))
+				: vscode.l10n.t('No distro is running.'),
+			managed.length > 0
+				? vscode.l10n.t('{0} belong to Docker, Podman, or Rancher Desktop and are not started again; start them from that tool.', managed.join(', '))
+				: '',
+			connected.length > 0
+				? vscode.l10n.t('VS Code windows connected to {0} lose their connection; if one does not reconnect, run "Developer: Reload Window" in it.', connected.join(', '))
+				: '',
+			vscode.l10n.t('Every WSL terminal will be closed. Windows does not restart.'),
+		].filter(Boolean);
+		const label = vscode.l10n.t('Restart WSL');
+		const choice = await vscode.window.showWarningMessage(
+			vscode.l10n.t('Restart WSL to apply .wslconfig?'),
+			{ modal: true, detail: detail.join('\n\n') },
+			label,
+		);
+		if (choice !== label) {
+			return;
+		}
+		await withProgress(vscode.l10n.t('Restarting WSL...'), async () => {
+			await wsl.shutdown();
+			await clearPending();
+			for (const name of toStart) {
+				await wsl.start(name).catch(() => undefined);
+			}
+		});
+		tree.invalidateDetails();
+		tree.refresh();
+		vscode.window.showInformationMessage(
+			toStart.length > 0
+				? vscode.l10n.t('WSL restarted with the new .wslconfig; {0} started again.', toStart.join(', '))
+				: vscode.l10n.t('WSL restarted; the new .wslconfig applies from the next distro you start.'),
+		);
 	});
 
 	register('wslManager.editWslConfig', async () => {

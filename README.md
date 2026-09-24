@@ -61,7 +61,9 @@ themselves.
 - Set the default distro, convert between WSL 1 and WSL 2, or shut down WSL.
 - Edit the global `.wslconfig` from the **WSL** node at the top of the view,
   which also summarizes its main settings and shows the WSL and kernel
-  versions. On save, the extension offers to run `wsl --shutdown` to apply it.
+  versions. Changes apply only after WSL restarts (Windows does not need to):
+  on save, the extension offers **Restart WSL**, which stops WSL and starts the
+  running distros again, and flags the change as pending until it applies.
   Distro system files such as `/etc/wsl.conf` are left to `sudo` inside the
   distro.
 
@@ -205,6 +207,11 @@ Interop** from the view's `...` menu. From inside the distro:
 ```bash
 sudo sh -c "echo :WSLInterop:M::MZ::/init:P > /proc/sys/fs/binfmt_misc/register"
 ```
+
+**A `.wslconfig` change has no effect.** It applies only when the WSL VM
+restarts, not Windows. Run **Restart WSL** from the **WSL** node; the
+*Settings (.wslconfig)* row shows *restart WSL to apply* until the change is in
+effect.
 
 **A VS Code window connected to WSL shows "Failed to connect to the remote
 extension host server".** WSL was shut down, for example by *Shut Down WSL*.

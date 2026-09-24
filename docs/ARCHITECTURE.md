@@ -142,6 +142,15 @@ times: the WSL VM clock drifted about 10 seconds from Windows, which made fresh
 locks look abandoned. Before taking over, a follower checks that the distro
 still runs, so it never boots a distro that just stopped.
 
+## Pending .wslconfig changes
+
+`.wslconfig` applies when the WSL VM boots. After a save, the extension stores
+the time in `globalState` and flags the setting as pending. Each time the WSL
+node loads, a running distro reports `/proc/uptime`; if the VM booted after
+the save, the flag clears. Uptime is a duration, so the VM clock drift does
+not matter. With no distro running the extension cannot tell whether the VM is
+still up, so the flag stays.
+
 ## Files inside distros
 
 **Root is used as little as possible.** WSL lets the Windows account enter

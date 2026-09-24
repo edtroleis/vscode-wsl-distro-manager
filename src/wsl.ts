@@ -863,3 +863,14 @@ export async function readWslConfig(): Promise<{ path: string; config: WslConfig
 	const text = await fs.readFile(file, 'utf8').catch(() => undefined);
 	return { path: file, config: text === undefined ? {} : parseWslConfig(text), exists: text !== undefined };
 }
+
+/** Seconds since the WSL VM booted, read in a running distro (from /proc/uptime). */
+export async function vmUptime(distro: string): Promise<number | undefined> {
+	const result = await run(['--distribution', distro, '--exec', 'cat', '/proc/uptime'], { tolerateFailure: true });
+	return parseUptime(result.stdout);
+}
+
+export function parseUptime(stdout: string): number | undefined {
+	const seconds = Number(stdout.trim().split(/\s+/)[0]);
+	return stdout.trim() && Number.isFinite(seconds) ? seconds : undefined;
+}

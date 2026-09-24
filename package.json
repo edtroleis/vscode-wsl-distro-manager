@@ -92,6 +92,12 @@
         "icon": "$(debug-stop)"
       },
       {
+        "command": "wslManager.restartWsl",
+        "title": "%command.restartWsl%",
+        "category": "WSL Distro Manager",
+        "icon": "$(debug-restart)"
+      },
+      {
         "command": "wslManager.repairInterop",
         "title": "%command.repairInterop%",
         "category": "WSL Distro Manager"
@@ -325,6 +331,26 @@
           "command": "wslManager.sendFiles",
           "when": "view == wslManager.distros && viewItem =~ /^wslDistro\\.(running|stopped)$/",
           "group": "5_files@2"
+        },
+        {
+          "command": "wslManager.restartWsl",
+          "when": "view == wslManager.distros && viewItem == wslGlobalConfig.pending",
+          "group": "inline"
+        },
+        {
+          "command": "wslManager.restartWsl",
+          "when": "view == wslManager.distros && viewItem =~ /^wslGlobal/",
+          "group": "1_wsl@1"
+        },
+        {
+          "command": "wslManager.shutdown",
+          "when": "view == wslManager.distros && viewItem =~ /^wslGlobal/",
+          "group": "1_wsl@2"
+        },
+        {
+          "command": "wslManager.editWslConfig",
+          "when": "view == wslManager.distros && viewItem =~ /^wslGlobal/",
+          "group": "0_edit@1"
         }
       ]
     },

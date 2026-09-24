@@ -13,6 +13,10 @@ project follows [Semantic Versioning](https://semver.org/).
 - A **WSL** node at the top of the view for what applies to all distros: the
   global `.wslconfig`, with its main settings summarized (memory, processors,
   swap, networking mode, ...), and the WSL and kernel versions.
+- **Restart WSL** command: stops WSL and starts the running distros again.
+- Saving `.wslconfig` explains that the change applies after WSL restarts
+  (not Windows) and offers the restart; until then, the WSL node shows the
+  change as pending, detected from the VM's uptime.
 
 ### Changed
 
