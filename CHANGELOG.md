@@ -6,6 +6,13 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.0.6] - 2026-09-24
+
+### Changed
+
+- Releases are published from GitHub Actions, signing in with Microsoft
+  Entra ID or an organization-scoped token. No change in the extension itself.
+
 ## [0.0.5] - 2026-09-24
 
 ### Changed

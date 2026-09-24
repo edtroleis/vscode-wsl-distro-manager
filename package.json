@@ -2,7 +2,7 @@
   "name": "vscode-wsl-distro-manager",
   "displayName": "Distro Manager for WSL",
   "description": "%description%",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "publisher": "edtroleis",
   "license": "MIT",
   "icon": "resources/icon.png",
