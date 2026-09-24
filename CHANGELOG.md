@@ -12,6 +12,8 @@ project follows [Semantic Versioning](https://semver.org/).
 
 - *Back Up Folders*: clicking a folder or a file did not keep it checked. A
   checked folder is backed up whole, without opening it.
+- *Back Up Folders*: ➔ on a folder closed the list. Each folder now opens in
+  a list of its own.
 - *Back Up Folders*: accepting the list with nothing checked closed it and did
   nothing. It now stays open; on a folder, it opens the folder.
 - Running distros show a green icon again.

@@ -394,11 +394,7 @@ export async function pickHomePaths(
 	// Replacing the items (opening a folder) clears the checks and echoes that
 	// too; until then, the list is kept in line with the selection instead.
 	let settleUntil = 0;
-
-	const pick = vscode.window.createQuickPick<PathItem>();
-	pick.canSelectMany = true;
-	pick.ignoreFocusOut = true;
-	pick.matchOnDescription = false;
+	let pick = vscode.window.createQuickPick<PathItem>();
 
 	const inherited = () => selected.some((p) => p !== folder && isWithin(folder, p));
 
@@ -424,107 +420,150 @@ export async function pickHomePaths(
 				: vscode.l10n.t('Check to include; ➔ opens a folder to choose items inside; OK when done.');
 	};
 
-	/** Shows a folder's entries; only navigation replaces the items. */
-	const render = (items: PathItem[]) => {
-		viewKeys = items.filter((i) => i.key !== TYPED).map((i) => i.key);
-		pick.buttons = folder === '.' ? [] : [upButton];
-		pick.items = items;
-		updateText();
-		settleUntil = Date.now() + 500;
-		showChecks(desiredChecks());
-	};
-
-	const open = async (target: string) => {
-		log().info(`backup picker: open ${target}`);
-		pick.busy = true;
-		const entries = await listFolder(distro.name, target).catch(() => []);
-		pick.busy = false;
-		folder = target;
-		if (target === '.') {
-			homeNames = entries.map((e) => e.name);
-		}
-		const everything: PathItem = {
-			key: target,
-			label: `$(check-all) ${target === '.' ? vscode.l10n.t('Everything in your home folder') : vscode.l10n.t('Everything in {0}/', target)}`,
-		};
-		const rows: PathItem[] = entries
-			.sort((x, y) => Number(y.isDir) - Number(x.isDir) || x.name.localeCompare(y.name))
-			.map((e) => ({
-				key: childPath(target, e.name),
-				label: `$(${e.isDir ? 'folder' : 'file'}) ${e.name}`,
-				isDir: e.isDir,
-				buttons: e.isDir ? [openButton] : undefined,
-			}));
-		const typeRow: PathItem = {
-			key: TYPED,
-			label: `$(edit) ${vscode.l10n.t('Type paths...')}`,
-			description: vscode.l10n.t('Relative to home or absolute'),
-		};
-		render(target === '.' ? [typeRow, everything, ...rows] : [everything, ...rows]);
-	};
-
 	const result = await new Promise<string[] | undefined>((resolve) => {
 		let done = false;
-		pick.onDidChangeSelection((items) => {
-			const keys = items.map((i) => i.key);
-			if (sameKeys(keys, uiChecked)) {
-				log().trace(`backup picker: echo [${keys.join(', ')}]`);
-				return;
-			}
-			if (Date.now() < settleUntil) {
-				log().debug(`backup picker: settling, keep [${desiredChecks().join(', ')}] over [${keys.join(', ')}]`);
-				showChecks(desiredChecks());
-				return;
-			}
-			const before = uiChecked.filter((k) => k !== TYPED);
-			const now = keys.filter((k) => k !== TYPED);
-			typed = keys.includes(TYPED);
-			if (!inherited()) {
-				selected = updateSelection(selected, folder, viewKeys, before, now);
-			}
-			uiChecked = keys;
-			log().info(`backup picker: in ${folder}, checked [${keys.join(', ')}] -> selection [${selected.join(', ')}]`);
-			updateText();
-			// Apply the rules ("Everything" vs. items) and undo clicks that cannot count.
-			const desired = desiredChecks();
-			if (!sameKeys(desired, keys)) {
-				showChecks(desired);
-			}
-		});
-		pick.onDidTriggerItemButton((e) => {
-			log().info(`backup picker: item button on ${e.item.key}`);
-			void open(e.item.key);
-		});
-		pick.onDidTriggerButton((button) => {
-			if (button === upButton) {
-				const up = folder.includes('/') ? folder.slice(0, folder.lastIndexOf('/')) : '.';
-				void open(up);
-			}
-		});
-		pick.onDidAccept(() => {
-			const active = (pick.activeItems ?? [])[0];
-			log().info(`backup picker: accepted with [${selected.join(', ')}] (active: ${active?.key ?? 'none'})`);
-			if (selected.length === 0 && !typed) {
-				// Nothing to back up yet: an accept here (Enter, or a click VS Code
-				// read as one) must not close the list and silently do nothing.
-				// On a folder it opens it; elsewhere it says what to do.
-				if (active?.isDir) {
-					void open(active.key);
-				} else {
-					pick.placeholder = vscode.l10n.t('Nothing selected yet. Check folders or files, then OK.');
+
+		/**
+		 * Each folder gets a new quick pick. Replacing the items of the open one
+		 * from its ➔ button made VS Code close the list without reporting it
+		 * (no onDidHide), which left the backup stuck.
+		 */
+		const create = (items: PathItem[]) => {
+			const previous = pick;
+			const current = vscode.window.createQuickPick<PathItem>();
+			pick = current;
+			current.canSelectMany = true;
+			current.ignoreFocusOut = true;
+			current.matchOnDescription = false;
+			// Events from a list that was replaced by another folder's are ignored.
+			const live = <T>(handler: (arg: T) => void) => (arg: T) => {
+				if (pick === current && !done) {
+					handler(arg);
 				}
+			};
+			current.onDidChangeSelection(
+				live((selection: readonly PathItem[]) => {
+					const keys = selection.map((i) => i.key);
+					if (sameKeys(keys, uiChecked)) {
+						return;
+					}
+					if (Date.now() < settleUntil) {
+						showChecks(desiredChecks());
+						return;
+					}
+					const before = uiChecked.filter((k) => k !== TYPED);
+					const now = keys.filter((k) => k !== TYPED);
+					typed = keys.includes(TYPED);
+					if (!inherited()) {
+						selected = updateSelection(selected, folder, viewKeys, before, now);
+					}
+					uiChecked = keys;
+					log().info(`backup picker: in ${folder}, checked [${keys.join(', ')}] -> selection [${selected.join(', ')}]`);
+					updateText();
+					// Apply the rules ("Everything" vs. items) and undo clicks that cannot count.
+					const desired = desiredChecks();
+					if (!sameKeys(desired, keys)) {
+						showChecks(desired);
+					}
+				}),
+			);
+			current.onDidTriggerItemButton(
+				live((e: vscode.QuickPickItemButtonEvent<PathItem>) => {
+					log().info(`backup picker: item button on ${e.item.key}`);
+					void open(e.item.key);
+				}),
+			);
+			current.onDidTriggerButton(
+				live((button: vscode.QuickInputButton) => {
+					if (button === upButton) {
+						void open(folder.includes('/') ? folder.slice(0, folder.lastIndexOf('/')) : '.');
+					}
+				}),
+			);
+			current.onDidAccept(
+				live(() => {
+					const active = (current.activeItems ?? [])[0];
+					log().info(`backup picker: accepted with [${selected.join(', ')}] (active: ${active?.key ?? 'none'})`);
+					if (selected.length === 0 && !typed) {
+						// Nothing to back up yet: an accept here (Enter, or a click VS Code
+						// read as one) must not close the list and silently do nothing.
+						// On a folder it opens it; elsewhere it says what to do.
+						if (active?.isDir) {
+							void open(active.key);
+						} else {
+							current.placeholder = vscode.l10n.t('Nothing selected yet. Check folders or files, then OK.');
+						}
+						return;
+					}
+					done = true;
+					resolve(selected);
+					current.hide();
+				}),
+			);
+			current.onDidHide(() => {
+				if (pick === current && !done) {
+					log().info('backup picker: closed without OK');
+					done = true;
+					resolve(undefined);
+				}
+				current.dispose();
+			});
+
+			viewKeys = items.filter((i) => i.key !== TYPED).map((i) => i.key);
+			current.buttons = folder === '.' ? [] : [upButton];
+			current.items = items;
+			updateText();
+			current.show();
+			previous.dispose();
+			settleUntil = Date.now() + 500;
+			showChecks(desiredChecks());
+		};
+
+		const open = async (target: string) => {
+			log().info(`backup picker: open ${target}`);
+			const from = pick;
+			from.busy = true;
+			const entries = await listFolder(distro.name, target).catch((error: unknown) => {
+				log().warn(`backup picker: cannot list ${target}: ${String(error)}`);
+				return [];
+			});
+			from.busy = false;
+			if (done || pick !== from) {
 				return;
 			}
-			done = true;
-			resolve(selected);
-			pick.hide();
-		});
-		pick.onDidHide(() => {
-			log().info(`backup picker: hidden ${done ? 'after OK' : 'without OK (Escape, or closed by VS Code)'}`);
-			if (!done) {
+			folder = target;
+			if (target === '.') {
+				homeNames = entries.map((e) => e.name);
+			}
+			const everything: PathItem = {
+				key: target,
+				label: `$(check-all) ${target === '.' ? vscode.l10n.t('Everything in your home folder') : vscode.l10n.t('Everything in {0}/', target)}`,
+			};
+			const rows: PathItem[] = entries
+				.sort((x, y) => Number(y.isDir) - Number(x.isDir) || x.name.localeCompare(y.name))
+				.map((e) => ({
+					key: childPath(target, e.name),
+					label: `$(${e.isDir ? 'folder' : 'file'}) ${e.name}`,
+					isDir: e.isDir,
+					buttons: e.isDir ? [openButton] : undefined,
+				}));
+			const typeRow: PathItem = {
+				key: TYPED,
+				label: `$(edit) ${vscode.l10n.t('Type paths...')}`,
+				description: vscode.l10n.t('Relative to home or absolute'),
+			};
+			create(target === '.' ? [typeRow, everything, ...rows] : [everything, ...rows]);
+		};
+
+		// A placeholder list while the home folder loads.
+		const loading = pick;
+		loading.title = vscode.l10n.t('Back up from {0}: ~/{1}', distro.name, '');
+		loading.busy = true;
+		loading.onDidHide(() => {
+			if (pick === loading && !done) {
+				done = true;
 				resolve(undefined);
 			}
-			pick.dispose();
 		});
 		pick.show();
 		void open('.');

@@ -60,10 +60,15 @@ class FakeQuickPick {
 	}
 	show() {}
 	hide() {
+		if (this.hidden) {
+			return;
+		}
 		this.hidden = true;
 		this.emit('hide');
 	}
-	dispose() {}
+	dispose() {
+		this.hide();
+	}
 
 	/** A user click on a row's checkbox. */
 	toggle(key: string) {
@@ -92,88 +97,113 @@ const list = async (_distro: string, folder: string) => tree[folder] ?? [];
 const settle = (ms = 700) => new Promise((r) => setTimeout(r, ms));
 const distro = { name: 'Ubuntu', state: 'Running', version: 2, isDefault: false, running: true };
 
+/**
+ * The picker opens a new quick pick per folder; `fake` always points at the
+ * one on screen, and replaced ones are hidden as VS Code does.
+ */
 function start() {
-	const fake = new FakeQuickPick();
-	(window as any).createQuickPick = () => fake;
+	const picks: FakeQuickPick[] = [];
+	(window as any).createQuickPick = () => {
+		const next = new FakeQuickPick();
+		const shown = picks.at(-1);
+		next.show = () => {
+			if (shown && !shown.hidden) {
+				shown.hide();
+			}
+		};
+		picks.push(next);
+		return next;
+	};
 	const result = pickHomePaths(distro, list);
-	return { fake, result };
+	return {
+		get fake() {
+			return picks.at(-1)!;
+		},
+		result,
+	};
 }
 
 describe('backup picker (asynchronous selection events, as in VS Code)', () => {
 	it('keeps a folder checked after clicking it, and backs up all of it without opening it', async () => {
-		const { fake, result } = start();
+		const picker = start();
+		const { result } = picker;
 		await settle();
-		fake.toggle('code');
+		picker.fake.toggle('code');
 		await settle(100);
-		assert.deepEqual(fake.checked(), ['code']);
-		fake.accept();
+		assert.deepEqual(picker.fake.checked(), ['code']);
+		picker.fake.accept();
 		assert.deepEqual((await result)?.paths, ['code']);
 	});
 
 	it('keeps single files checked too', async () => {
-		const { fake, result } = start();
+		const picker = start();
+		const { result } = picker;
 		await settle();
-		fake.toggle('notes.txt');
+		picker.fake.toggle('notes.txt');
 		await settle(100);
-		fake.toggle('code');
+		picker.fake.toggle('code');
 		await settle(100);
-		assert.deepEqual(fake.checked(), ['code', 'notes.txt']);
-		fake.accept();
+		assert.deepEqual(picker.fake.checked(), ['code', 'notes.txt']);
+		picker.fake.accept();
 		assert.deepEqual((await result)?.paths.sort(), ['code', 'notes.txt']);
 	});
 
 	it('chooses items inside a folder, and keeps them after going back up', async () => {
-		const { fake, result } = start();
+		const picker = start();
+		const { result } = picker;
 		await settle();
-		fake.openFolder('code');
+		picker.fake.openFolder('code');
 		await settle();
-		fake.toggle('code/README.md');
+		picker.fake.toggle('code/README.md');
 		await settle(100);
-		assert.deepEqual(fake.checked(), ['code/README.md']);
-		fake.accept();
+		assert.deepEqual(picker.fake.checked(), ['code/README.md']);
+		picker.fake.accept();
 		assert.deepEqual((await result)?.paths, ['code/README.md']);
 	});
 
 	it('"Everything" inside a folder unchecks the items chosen there', async () => {
-		const { fake, result } = start();
+		const picker = start();
+		const { result } = picker;
 		await settle();
-		fake.openFolder('code');
+		picker.fake.openFolder('code');
 		await settle();
-		fake.toggle('code/app');
+		picker.fake.toggle('code/app');
 		await settle(100);
-		fake.toggle('code');
+		picker.fake.toggle('code');
 		await settle(100);
-		assert.deepEqual(fake.checked(), ['code']);
-		fake.accept();
+		assert.deepEqual(picker.fake.checked(), ['code']);
+		picker.fake.accept();
 		assert.deepEqual((await result)?.paths, ['code']);
 	});
 
 	it('unchecking removes it', async () => {
-		const { fake, result } = start();
+		const picker = start();
+		const { result } = picker;
 		await settle();
-		fake.toggle('code');
+		picker.fake.toggle('code');
 		await settle(100);
-		fake.toggle('code');
+		picker.fake.toggle('code');
 		await settle(100);
-		assert.deepEqual(fake.checked(), []);
-		fake.hide();
+		assert.deepEqual(picker.fake.checked(), []);
+		picker.fake.hide();
 		assert.equal(await result, undefined);
 	});
 
 	it('stays open when accepted with nothing checked, and opens the folder under the cursor', async () => {
-		const { fake, result } = start();
+		const picker = start();
+		const { result } = picker;
 		await settle();
-		fake.accept('code');
+		picker.fake.accept('code');
 		await settle();
-		assert.equal(fake.hidden, false);
-		assert.ok(fake.items.some((i) => i.key === 'code/README.md'), 'opened code/');
-		fake.accept('code/README.md');
+		assert.equal(picker.fake.hidden, false);
+		assert.ok(picker.fake.items.some((i) => i.key === 'code/README.md'), 'opened code/');
+		picker.fake.accept('code/README.md');
 		await settle(100);
-		assert.equal(fake.hidden, false);
-		assert.match(fake.placeholder, /Nothing selected/);
-		fake.toggle('code/README.md');
+		assert.equal(picker.fake.hidden, false);
+		assert.match(picker.fake.placeholder, /Nothing selected/);
+		picker.fake.toggle('code/README.md');
 		await settle(100);
-		fake.accept();
+		picker.fake.accept();
 		assert.deepEqual((await result)?.paths, ['code/README.md']);
 	});
 });
