@@ -109,7 +109,7 @@ publishing.
 | File | Shows |
 |---|---|
 | `demo.gif` *(retake: shows .wslconfig under the distro and Edit /etc/wsl.conf)* | The top of the README: expanding a running distro (live metrics, reclaimable space), the context menu, and a backup. Under 5 MB, recorded with ScreenToGif at 12 fps. |
-| `overview.png` *(retake: shows `.wslconfig` under the distro)* | Several distros, one expanded and running: live metrics, details, reclaimable VHDX space, Podman labels. |
+| `overview.png` | The WSL node and several distros, one expanded and running: live metrics with VM totals, details, reclaimable VHDX space, Podman labels. |
 | `compact.png` *(retake: shows `.wslconfig` under the distro)* | The VHDX row with reclaimable space and the *Compact Disk* confirmation. |
 | `compact-shutdown.png` | The confirmation to shut WSL down for a compaction. |
 | `compact-progress.png` | The compaction progress with the elapsed time. |

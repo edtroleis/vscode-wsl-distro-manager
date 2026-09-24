@@ -29,7 +29,7 @@ themselves.
 - Expand a distro for its OS, kernel, default user, disk usage, install
   location, and virtual disk (VHDX) size.
 
-![The WSL Distro Manager view with the default distro expanded: live CPU, memory, and process count, OS and disk details, and about 8.4 GB of reclaimable disk space. Podman distros are labeled.](images/overview.png)
+![The WSL Distro Manager view: the WSL node with the .wslconfig summary (memory=25GB, processors=8) and the WSL and kernel versions; a running distro expanded with live CPU and memory next to the VM totals, details, and about 8.3 GB of reclaimable disk space. Podman distros are labeled.](images/overview.png)
 
 **Reclaim disk space**
 - See how much space a distro's virtual disk holds beyond what it uses, and
