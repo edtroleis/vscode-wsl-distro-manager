@@ -6,76 +6,7 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [1.1.0] - 2026-09-24
-
-### Added
-
-- A **WSL** node at the top of the view for what applies to all distros: the
-  global `.wslconfig`, with its main settings summarized (memory, processors,
-  swap, networking mode, ...), and the WSL and kernel versions.
-- **Restart WSL** command: stops WSL and starts again only the distros that
-  were running (not Docker, Podman, or Rancher ones). It runs from a local
-  VS Code window, since from inside WSL it would stop the extension itself.
-- Saving `.wslconfig` explains that the change applies after WSL restarts
-  (not Windows) and offers the restart; until then, the WSL node shows the
-  change as pending, detected from the VM's uptime.
-
-### Changed
-
-- `.wslconfig` is no longer listed under every distro.
-
-### Security
-
-- Nothing runs as root inside a distro without the user's consent. Repairing
-  Windows interop used to run silently as root (`wsl -u root`, which needs no
-  password); the extension now only detects the problem, as the default user,
-  and offers the repair, which runs through the distro's `sudo` and asks for
-  the password when the distro requires it.
-- Compaction no longer runs `fstrim` as root before `diskpart`.
-- The `diskpart` commands no longer go through a temporary script file, which
-  another program could have changed between the UAC prompt and the run; they
-  are passed inside the elevated process's command line.
-- Windows programs, including the elevated PowerShell and `diskpart`, are
-  started by absolute path from `System32`, never looked up by name.
-- Backups that include folders usually holding credentials (`.ssh`, `.aws`,
-  `.kube`, ...) ask first, and say when the destination is synced to the cloud.
-- The extension declares that it supports untrusted workspaces (it reads
-  nothing from them); CI runs with a read-only token and pinned actions.
-
-### Fixed
-
-- With no distro installed, the view showed "Failed to query wsl.exe" instead
-  of the *Install Distro* and *Import Distro* actions.
-- The CPU and memory tooltips closed within a second or two, because each
-  sample redraws the row. The WSL VM totals now appear in the row itself.
-- The distro tooltip showed *Running*/*Stopped* and *yes*/*no* in English in
-  other languages.
-- With `wslManager.showManagedDistros` off and only Docker/Podman distros
-  installed, the view claimed there were no distros; it now says they are
-  hidden.
-- Compaction could fail on a VHDX path with accented characters; it now passes
-  `diskpart` the short (8.3) path.
-- *Start* ignored `wslManager.wslExePath` for the session that keeps the distro
-  running.
-- *Copy Name* gave no feedback; it now confirms in the status bar.
-
-### Removed
-
-- Converting a distro between WSL 1 and WSL 2. Use
-  `wsl --set-version <distro> <1|2>` in a terminal if you need it.
-- Editing a distro's `/etc/wsl.conf`. WSL lets your Windows account enter any
-  distro as root without a password, so the extension saved system files with
-  no `sudo` prompt at all; a mistake there can keep a distro from starting.
-  Edit it inside the distro with `sudo`, where the distro's own rules apply.
-
-## [1.0.1] - 2026-09-23
-
-### Changed
-
-- The README shows the release status and the Marketplace version.
-- New versions are published automatically from the repository.
-
-## [1.0.0] - 2026-09-23
+## [0.0.1] - 2026-09-24
 
 First release.
 
@@ -84,13 +15,16 @@ First release.
 - **Distro view** in the activity bar, listing every WSL distro with its state,
   WSL version, and default marker. The distro of the current window is tagged
   *this window*.
+- **WSL node** at the top of the view for what applies to all distros: the
+  global `.wslconfig`, with its main settings summarized, and the WSL and
+  kernel versions.
 - **Details** on expand: OS, kernel, default user, disk usage, install location,
   virtual disk size, and the space a compaction would reclaim.
-- **Live CPU, memory, and process count** for running distros, sampled once per
-  distro and shared by every VS Code window.
-- **Lifecycle**: start, stop, restart, set the default distro, convert between
-  WSL 1 and WSL 2, unregister, and shut down WSL. Started distros keep running
-  until stopped.
+- **Live CPU, memory, and process count** for running distros, next to the WSL
+  VM totals, sampled once per distro and shared by every VS Code window.
+- **Lifecycle**: start, stop, restart, set the default distro, unregister, shut
+  down WSL, and **Restart WSL**, which starts again only the distros that were
+  running. Started distros keep running until stopped.
 - **Terminals and windows**: open a terminal in a distro, or a new VS Code
   window connected to it.
 - **Install** distros from the online catalog, with a chosen name and location.
@@ -101,24 +35,28 @@ First release.
 - **Back up** chosen folders to a `.tar.gz` or `.zip` on the Windows Desktop or
   another folder, and **send files** from Windows into a distro, extracting
   backups in place.
-- **Configuration files**: edit a distro's `/etc/wsl.conf` (saved as root) and
-  the global `.wslconfig`, with a prompt to apply changes on save.
-- **Repair Windows Interop** command, and automatic repair when a distro stops.
+- **`.wslconfig` editing**, with a prompt to restart WSL on save and a pending
+  mark until the change applies.
+- **Repair Windows Interop**, which WSL removes from running distros when one
+  stops.
 - **Languages**: English and Brazilian Portuguese.
 
-### Safety
+### Security
 
-- Destructive actions ask for confirmation; unregistering requires typing the
-  distro name.
-- Compaction and moving refuse to shut WSL down while VS Code windows are
-  connected to it, and change nothing.
-- Actions that would disconnect the current window always ask, even with
-  confirmations turned off.
+- Nothing runs as root inside a distro without the user's consent: the only
+  privileged step, repairing Windows interop, runs through the distro's `sudo`
+  after the user agrees. `wsl -u root`, which needs no password, is never used,
+  and no distro system file is edited.
+- Administrator rights only through the Windows UAC prompt (compaction), with
+  the `diskpart` commands passed inside the elevated process, not through a
+  file.
+- Windows programs are started by absolute path, never looked up by name.
+- Compacting and moving refuse to shut WSL down while VS Code windows are
+  connected to it; other shutdowns name the windows that will disconnect.
 - Distros managed by Docker Desktop, Podman, and Rancher Desktop are labeled,
   lose configuration actions, and warn before being stopped or unregistered.
-- Backups and sent files run as the distro's default user and never use `sudo`.
+- Backups and sent files run as the distro's default user, and backups that
+  include folders usually holding credentials ask first.
 
-[Unreleased]: https://github.com/edtroleis/vscode-wsl-distro-manager/compare/v1.1.0...HEAD
-[1.1.0]: https://github.com/edtroleis/vscode-wsl-distro-manager/compare/v1.0.1...v1.1.0
-[1.0.1]: https://github.com/edtroleis/vscode-wsl-distro-manager/compare/v1.0.0...v1.0.1
-[1.0.0]: https://github.com/edtroleis/vscode-wsl-distro-manager/releases/tag/v1.0.0
+[Unreleased]: https://github.com/edtroleis/vscode-wsl-distro-manager/compare/v0.0.1...HEAD
+[0.0.1]: https://github.com/edtroleis/vscode-wsl-distro-manager/releases/tag/v0.0.1

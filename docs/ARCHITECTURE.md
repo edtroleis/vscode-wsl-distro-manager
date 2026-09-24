@@ -174,7 +174,7 @@ still up, so the flag stays.
 **No root without consent.** WSL lets the Windows account enter any distro as
 root with `wsl -u root` and no password, bypassing the distro's `sudo` rules.
 The extension never uses it (editing `/etc/wsl.conf` and a silent interop
-repair both did, and were removed in 1.1.0). The one privileged step left,
+repair both did, and were removed before the first release). The one privileged step left,
 re-registering `WSLInterop`, runs through the distro's `sudo` after the user
 agrees: `sudo -n` first, which succeeds only if the distro allows it without a
 password, then `sudo -S` with the password on standard input. A default user

@@ -1,8 +1,8 @@
 {
-  "name": "wsl-distro-manager",
+  "name": "vscode-wsl-distro-manager",
   "displayName": "WSL Distro Manager",
   "description": "%description%",
-  "version": "1.1.0",
+  "version": "0.0.1",
   "publisher": "edtroleis",
   "license": "MIT",
   "icon": "resources/icon.png",

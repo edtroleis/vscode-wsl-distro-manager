@@ -42,12 +42,12 @@ jobs:
         run: npm run l10n && git diff --exit-code l10n/bundle.l10n.json
       - name: Package
         if: runner.os == 'Linux'
-        run: npx vsce package --out wsl-distro-manager.vsix
+        run: npx vsce package --out vscode-wsl-distro-manager.vsix
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: runner.os == 'Linux'
         with:
           name: vsix
-          path: wsl-distro-manager.vsix
+          path: vscode-wsl-distro-manager.vsix
 
   version:
     name: Version not yet published
