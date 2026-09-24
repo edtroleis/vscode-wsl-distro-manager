@@ -1,5 +1,5 @@
 {
-  "description": "Gerencie distros do WSL pela barra lateral: iniciar/parar, CPU e memória ao vivo, distro padrão, exportar/importar, instalar, mover, compactar disco e editar .wslconfig e /etc/wsl.conf.",
+  "description": "Gerencie distros do WSL pela barra lateral: inicie e pare, acompanhe CPU e memória, instale, mova, exporte e faça backup, recupere espaço em disco e edite o .wslconfig e o wsl.conf.",
   "welcome": "Nenhuma distro WSL encontrada.\n[Instalar Distro](command:wslManager.install)\n[Importar Distro](command:wslManager.import)\n[Atualizar](command:wslManager.refresh)",
   "command.refresh": "Atualizar",
   "command.shutdown": "Desligar o WSL (wsl --shutdown)",

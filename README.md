@@ -1,257 +1,224 @@
 # WSL Distro Manager
 
-Manage your WSL distros from the VS Code sidebar: lifecycle, live CPU and
-memory, default distro, backups, and editing of the configuration files.
+[![CI](https://img.shields.io/github/actions/workflow/status/edtroleis/vscode-wsl-distro-manager/ci.yml?branch=main&label=CI)](https://github.com/edtroleis/vscode-wsl-distro-manager/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-It does not replace the official **WSL** extension (`ms-vscode-remote.remote-wsl`),
-which is still what connects VS Code to a distro. This one covers what the
-official extension does not: start/stop, `--set-default`, export/import,
-`--shutdown`, resource monitoring, and editing `.wslconfig` and `/etc/wsl.conf`.
+Manage your Windows Subsystem for Linux distros from the VS Code sidebar. Start
+and stop them, watch their CPU and memory, install, move, and back them up,
+reclaim disk space, and edit their configuration, without leaving the editor.
 
-![WSL Distro Manager view: the default distro expanded with live CPU, memory, and process count, OS and disk details, and about 8.4 GB of reclaimable VHDX space; Podman distros are labeled](images/overview.png)
+![The WSL Distro Manager view with the default distro expanded: live CPU, memory, and process count, OS and disk details, and about 8.4 GB of reclaimable disk space. Podman distros are labeled.](images/overview.png)
+
+WSL Distro Manager complements Microsoft's **WSL** extension
+([`ms-vscode-remote.remote-wsl`](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-wsl)),
+which connects VS Code to a distro. This extension manages the distros
+themselves.
 
 ## Features
 
-| Action | WSL command behind it |
-|---|---|
-| List distros with state, version, and default | `wsl -l -q`, `wsl -l --running -q`, `wsl -l -v` |
-| Details on expand: OS, kernel, user, disk, location, VHDX size | registry `HKCU\...\Lxss`; `wsl -d <d> -e sh` only if the distro is already running |
-| Live CPU, memory, and process count (expanded, running distro) | `sh` loop over `/proc` via `wsl -d <d> -e` |
-| Compact the VHDX to reclaim disk space | `fstrim`, `wsl --terminate`, then `diskpart compact vdisk` (UAC prompt) |
-| Start / Stop / Restart | `wsl -d <d> -e /bin/true` + a hidden idle session, `wsl --terminate <d>` |
-| Set default distro | `wsl --set-default <d>` |
-| Convert WSL 1 ⇄ WSL 2 | `wsl --set-version <d> <n>` |
-| Install a distro from the online catalog | `wsl --list --online`, `wsl --install <d> --name <n> [--location <dir>] --no-launch` |
-| Export / Import (`.tar` or `.vhdx`), with progress and cancel | `wsl --export` / `wsl --import` |
-| Move a distro's disk to another folder or drive | `wsl --manage <d> --move <dir>` |
-| Back up chosen folders to a `.tar.gz` / `.zip` on Windows | `tar` / `zip` inside the distro, as your user |
-| Send Windows files into the distro, and restore backups there | `cp`, `tar -x` / `unzip` inside the distro, as your user |
-| Unregister a distro | `wsl --unregister <d>` |
-| Shut down WSL | `wsl --shutdown` |
-| Open a terminal | `wsl -d <d> [-u <user>]` |
-| Open a new connected window | authority `wsl+<d>` |
-| Edit the distro's `/etc/wsl.conf` | `wsl -d <d> -u root` |
-| Edit the global `.wslconfig` | `%USERPROFILE%\.wslconfig` |
+**See every distro at a glance**
+- State, WSL version, and default distro, refreshed automatically.
+- Expand a distro for its OS, kernel, default user, disk usage, install
+  location, and virtual disk (VHDX) size.
+- Live CPU, memory, and process count for running distros.
 
-Every action is also in the distro's context menu:
+**Control them**
+- Start, stop, and restart. A started distro stays running until you stop it;
+  WSL would otherwise stop it about 15 seconds later.
+- Open a terminal, or a new VS Code window connected to the distro.
+- Set the default distro, convert between WSL 1 and WSL 2, or shut down WSL.
 
-![Context menu of a distro: open window or terminal, stop, restart, set default, edit wsl.conf, convert, export, compact disk, copy name, unregister](images/context-menu.png)
+**Install, move, and back up**
+- Install distros from the official online catalog, with the name and location
+  you choose.
+- Export and import (`.tar` or `.vhdx`), with progress and cancel.
+- Move a distro's disk to another folder or drive.
+- Back up chosen folders to a `.tar.gz` or `.zip` on Windows, and send Windows
+  files into a distro, restoring backups in place.
 
-Long operations (export, import, move, install) show progress and can be
-cancelled. Cancelling ends the whole `wsl.exe` process tree, which really stops
-the work in the WSL service: an export stops writing and its partial file is
-deleted, and a cancelled import leaves nothing registered. Moving a distro, like
-compacting it, needs its disk released, which current WSL only does when the
-whole VM shuts down; the same rules apply (see below).
+**Reclaim disk space**
+- See how much space a distro's virtual disk holds beyond what it uses, and
+  compact it to give that space back to Windows.
 
-Destructive actions (stop, shut down, convert) ask for confirmation;
-`unregister` requires typing the distro name. Actions that would disconnect the
-current VS Code window always ask, even with confirmations turned off.
+**Configure**
+- Edit a distro's `/etc/wsl.conf` (saved as root) and the global `.wslconfig`.
+  On save, the extension offers the step that applies the change.
 
-### Reclaiming disk space
+**Stay safe**
+- Destructive actions ask first; unregistering requires typing the distro name.
+- Actions that would disconnect a VS Code window from WSL are refused or
+  confirmed explicitly.
+- Distros owned by Docker Desktop, Podman, or Rancher Desktop are labeled and
+  protected.
+- Repairs Windows interop when WSL removes it (see
+  [Troubleshooting](#troubleshooting)).
 
-A WSL 2 distro keeps its files in a VHDX that grows but never shrinks on its own:
-space freed inside the distro stays allocated on the Windows drive. When a
-running distro is expanded, the **VHDX** row shows how much a compaction would
-give back, with an inline **Compact Disk** button. The estimate only appears when
-the gap between the file and the used space is at least 2 GB and 10% of the used
-space: the VHDX always holds some file system overhead beyond what `df` reports,
-so smaller gaps reclaim almost nothing (in testing, a 1.2 GB gap gave back 23 MB).
-The confirmation repeats the estimate, or warns when there is little to gain.
+## Requirements
 
-Compacting stops the distro, asks Windows for administrator permission (UAC) to
-run `diskpart`, and starts the distro again if it was running.
+- Windows 10 or 11 with WSL installed. Tested with WSL 2.7.
+- VS Code 1.85 or later.
+- *Install Distro* and *Move to Another Folder* need a recent WSL. Run
+  `wsl --update` if they fail.
+- *Open in New VS Code Window* needs Microsoft's WSL extension.
 
-![The VHDX row shows 52.8 GB with about 9.9 GB reclaimable, and the Compact Disk confirmation](images/compact.png)
+## Getting started
 
-Current WSL versions keep **every** distro's disk attached to the WSL VM while
-any distro is running, even disks of distros that have stopped. When that is the
-case, the extension lists the running distros and asks to shut WSL down; after
-compacting, it starts them again (except Docker/Podman/Rancher distros, which
-must be started from their tool).
+1. Install **WSL Distro Manager** from the Marketplace.
+2. Click the **WSL Distro Manager** icon in the activity bar.
+3. Click a distro to expand it. Right-click it for every action, or use the
+   buttons on its row.
 
-![Confirmation to shut down WSL to compact a stopped distro, listing the running distros that will be restarted; behind it, the default distro shows about 8.4 GB reclaimable](images/compact-shutdown.png)
+Every action is also in the Command Palette (`Ctrl+Shift+P`), under
+**WSL Distro Manager**.
 
-A shutdown would disconnect every VS Code window connected to WSL, and those
-windows do not reliably reconnect afterwards. So when any VS Code window is
-connected to WSL (detected through the `wsl.exe` processes running the VS Code
-server), compaction **refuses to shut WSL down**, changes nothing, and names the
-windows to close. Close them and run *Compact Disk* from a local VS Code window;
-WSL terminals are closed by the shutdown. `diskpart` reports no progress, and a
-50 GB disk takes a few minutes `diskpart` reports no progress, and a 50 GB disk takes a few minutes
-(the notification shows the elapsed time).
+## Guides
 
-![Progress notification: running diskpart, 0m 14s elapsed](images/compact-progress.png)
+### Reclaim disk space
 
-### Backups and sending files
+A WSL 2 distro stores its files in a virtual disk (VHDX) that grows but never
+shrinks on its own: space freed inside the distro stays allocated on your
+Windows drive. When a running distro is expanded, its **VHDX** row shows the
+space a compaction would give back, next to a **Compact Disk** button.
 
-**Back Up Folders...** archives folders and files of your choice from the distro
-into one file on Windows, without exporting the whole distro. Pick entries of
-your home folder from a list, or type paths (relative to home, or absolute). The
-file goes to your Windows **Desktop** by default, found through Windows, so a
-Desktop redirected to OneDrive works too; `wslManager.backupFolder` or
-*Choose a folder...* picks another place. Folders such as `node_modules`,
-`.venv`, and `target` are left out by default (`wslManager.backupExcludes`,
-editable each time).
+![The VHDX row shows 52.8 GB with about 9.9 GB reclaimable, and the Compact Disk confirmation.](images/compact.png)
 
-`.tar.gz` is the default because it keeps Linux permissions and symlinks;
-`.zip` opens anywhere but loses them, so scripts stop being executable after a
-restore. The archiver runs inside the distro as your user: files you cannot
-read are left out, and the result says so. Absolute paths are stored without the
-leading `/`.
+The estimate appears only when compaction is worth it: at least 2 GB and 10% of
+the space in use. A virtual disk always holds some file system overhead, so a
+smaller gap gives back almost nothing. The confirmation repeats the expected
+gain, or warns when there is little to reclaim.
 
-**Send Files to Distro...** copies Windows files into a folder of the distro
-(`~` by default). It runs as your user and never uses `sudo`: if the folder needs
-more permissions, it says so and changes nothing. Every question is part of the
-same prompt sequence, before anything is copied: whether to overwrite or skip
-files that already exist, and, when you send a `.tar.gz` / `.zip`, whether to
-extract it there, which restores a backup in place.
+Compaction stops the distro, asks Windows for administrator permission (UAC) to
+run `diskpart`, then starts the distro again. Current WSL versions keep every
+distro's disk attached while *any* distro is running. In that case the
+extension asks to shut WSL down, lists the running distros, and starts them
+again afterwards.
+
+![Confirmation to shut down WSL for the compaction, listing the running distros that will be restarted.](images/compact-shutdown.png)
+
+A shutdown disconnects every VS Code window connected to WSL, and those windows
+do not always reconnect. **Compaction therefore refuses to run while a VS Code
+window is connected to WSL.** It changes nothing and names the windows to
+close. Close them, then run *Compact Disk* from a local VS Code window. A 50 GB
+disk takes a few minutes; the notification shows the elapsed time.
+
+![Progress notification: running diskpart, 0m 14s elapsed.](images/compact-progress.png)
+
+### Back up folders and restore them
+
+**Back Up Folders...** archives the folders and files you choose, without
+exporting the whole distro:
+
+1. Pick entries of your home folder from the list, or type paths (relative to
+   your home, or absolute).
+2. Choose the format. `.tar.gz` is recommended: it keeps Linux permissions and
+   symbolic links. `.zip` opens anywhere but loses them, so restored scripts are
+   no longer executable.
+3. Review the names to leave out. `node_modules`, `.venv`, `venv`,
+   `__pycache__`, `.cache`, and `target` are excluded by default.
+4. Choose where to save it: your Windows **Desktop** (also when it is redirected
+   to OneDrive), the folder in `wslManager.backupFolder`, or any other folder.
+
+The backup runs inside the distro as your user. Files you cannot read are left
+out, and the result tells you so.
+
+To restore, use **Send Files to Distro...**, send the archive to the folder it
+came from (usually `~`), and choose **Send and extract**.
+
+### Send files into a distro
+
+**Send Files to Distro...** copies files from Windows into a folder of the
+distro, `~` by default. It runs as your user and never uses `sudo`: if the
+folder needs more permissions, it says so and changes nothing. Before copying,
+it asks whether to overwrite or skip files that already exist, and whether to
+extract `.tar.gz` or `.zip` archives.
+
+### Install, move, export, and import
+
+- **Install Distro...** lists the online catalog. After installing, open a
+  terminal in the new distro to create its default user.
+- **Move to Another Folder...** moves the distro's virtual disk, for example to
+  another drive. Like compaction, it needs the disk released, so the same rules
+  about shutting WSL down apply.
+- **Export** and **Import** show progress and can be cancelled. A cancelled
+  export deletes its partial file, and a cancelled import leaves nothing
+  behind.
 
 ### Distros managed by other tools
 
 Distros created by **Docker Desktop** (`docker-desktop`, `docker-desktop-data`),
-**Podman** (`podman-*`), and **Rancher Desktop** are labeled with the tool's name.
-Configuration actions are hidden for them, and stopping or unregistering one always
-warns first, since doing so from here can break that tool. Set
+**Podman** (`podman-*`), and **Rancher Desktop** show the tool's name.
+Configuration actions are hidden for them, and stopping or unregistering one
+warns first, because doing it from here can break that tool. Set
 `wslManager.showManagedDistros` to `false` to hide them.
-
-After saving `wsl.conf` or `.wslconfig`, the extension offers the step that
-applies it: restarting the distro or running `wsl --shutdown`.
 
 ## Settings
 
-| Key | Default | Description |
+| Setting | Default | Description |
 |---|---|---|
-| `wslManager.clickAction` | `expand` | What clicking a distro does: `expand` (details), `terminal`, `window`, or `none`. |
+| `wslManager.clickAction` | `expand` | What clicking a distro does: `expand`, `terminal`, `window`, or `none`. |
+| `wslManager.autoRefreshSeconds` | `10` | Refresh interval while the view is visible. `0` turns it off. |
+| `wslManager.metricsIntervalSeconds` | `2` | CPU and memory sampling interval for an expanded distro. |
 | `wslManager.showManagedDistros` | `true` | Show Docker Desktop, Podman, and Rancher Desktop distros. |
-| `wslManager.backupFolder` | `""` | Where backups go first. Empty = the Windows Desktop. |
+| `wslManager.backupFolder` | *(empty)* | Folder offered first for backups. Empty means the Windows Desktop. |
 | `wslManager.backupExcludes` | `node_modules`, `.venv`, ... | Names left out of backups, at any depth. |
-| `wslManager.metricsIntervalSeconds` | `2` | CPU/memory sampling interval for an expanded distro. |
-| `wslManager.autoRefreshSeconds` | `10` | Automatic refresh while the view is visible. `0` disables it. |
-| `wslManager.defaultUser` | `""` | User for opened terminals. Empty = the distro's default. |
-| `wslManager.wslExePath` | `""` | Path to `wsl.exe`. Empty = auto-detect. |
-| `wslManager.confirmDestructiveActions` | `true` | Confirm before terminate/shutdown/unregister. |
+| `wslManager.defaultUser` | *(empty)* | User for new terminals. Empty means the distro's default user. |
+| `wslManager.confirmDestructiveActions` | `true` | Confirm before stopping, shutting down, or unregistering. |
+| `wslManager.wslExePath` | *(empty)* | Path to `wsl.exe`. Empty means detect it automatically. |
+
+## Known limitations
+
+- **Compacting or moving a disk needs WSL shut down** on current WSL versions,
+  which closes every WSL terminal. The extension refuses while VS Code windows
+  are connected to WSL rather than disconnect them.
+- **Memory is an estimate.** It adds up the memory of each process, so memory
+  shared between processes counts more than once.
+- **Started distros keep running** until you stop them, even after VS Code
+  closes. This is what *Start* is for, but it keeps the WSL VM using memory.
+- **Live metrics keep an expanded distro running.** Collapse it, or hide the
+  view, to let WSL stop it.
+
+## Troubleshooting
+
+**`.exe` files stop working inside a distro ("Exec format error").**
+When a distro stops, WSL removes Windows interop from every other running
+distro. The extension restores it automatically after its own actions and when
+it notices a distro stopped. To restore it on demand, run **Repair Windows
+Interop** from the view's `...` menu. From inside the distro:
+
+```bash
+sudo sh -c "echo :WSLInterop:M::MZ::/init:P > /proc/sys/fs/binfmt_misc/register"
+```
+
+**A VS Code window connected to WSL shows "Failed to connect to the remote
+extension host server".** WSL was shut down, for example by *Shut Down WSL*.
+Run **Developer: Reload Window** in that window.
+
+**Installing a downloaded `.vsix` fails with "UNC host 'wsl.localhost' access
+is not allowed".** VS Code on Windows does not open files inside a distro.
+Copy the `.vsix` to a Windows folder first.
+
+**The view is empty or shows an error.** Check that `wsl.exe --list` works in a
+terminal. If `wsl.exe` is not on the `PATH`, set `wslManager.wslExePath`.
+
+## Privacy
+
+The extension collects no telemetry and makes no network requests. Installing
+a distro and listing the catalog go through `wsl.exe`, which downloads from
+Microsoft. Live metrics are shared between VS Code windows through files in
+`%TEMP%\wsl-distro-manager`.
 
 ## Languages
 
-English and Brazilian Portuguese. The extension follows VS Code's display
-language (`Configure Display Language`; Portuguese needs the *Portuguese
-(Brazil) Language Pack*). UI strings live in [`l10n/`](l10n/) and
-[`package.nls.pt-br.json`](package.nls.pt-br.json); `npm run l10n` re-extracts
-the English strings from the source, and CI fails if they are out of date. A unit
-test checks that every string has a translation with the same placeholders.
+English and Brazilian Portuguese. The extension follows the VS Code display
+language (**Configure Display Language**).
 
-## Requirements
+## Contributing
 
-Windows 10/11 with WSL installed. The extension also works from a VS Code
-window connected to a WSL distro; it then calls `wsl.exe` through interop.
-
-## Implementation notes
-
-WSL pitfalls the extension handles explicitly:
-
-**1. Encoding.** `wsl.exe` writes **UTF-16LE without a BOM**, and `WSL_UTF8=1` is
-ignored by several builds (confirmed on WSL 2.7.14). Reading it as UTF-8 yields a
-`\0` between every character. `decode()` in [`src/wsl.ts`](src/wsl.ts) checks for a
-BOM and, failing that, for the NUL byte pattern.
-
-**2. Localized `STATE` column.** On non-English Windows the state is translated
-and may contain spaces, so slicing `wsl -l -v` by column position breaks. Names
-come from `-l -q` and state from `-l --running -q`; from the verbose output only
-the `*` marker and the last token (always the numeric version) are used.
-
-**3. `/etc/wsl.conf` requires root.** The `\\wsl.localhost` share accesses the
-distro as the default user, so writing to `/etc` fails with *permission denied*.
-The extension registers a `FileSystemProvider` on the `wsl-config:` scheme that
-reads and writes through `wsl -d <d> -u root`, normalizing CRLF → LF on save. The
-distro name goes in the URI *path*, never the *authority*: VS Code lowercases the
-authority, and names like `FedoraLinux-43` and `fedora-linux-43` can coexist.
-
-**4. Which host the extension runs on.** `extensionKind` is `["ui", "workspace"]`:
-preferably on the Windows host, falling back to the remote host. `["ui"]` alone
-would prevent developing from a window connected to WSL, since the Windows host
-does not load an extension that lives on the Linux filesystem.
-
-With the fallback both hosts work, but each path moves:
-
-| | Windows host | remote host (WSL) |
-|---|---|---|
-| `wsl.exe` | `wsl.exe` on PATH | `/mnt/c/Windows/System32/wsl.exe` (interop) |
-| `.wslconfig` | `os.homedir()` | `cmd.exe /c echo %USERPROFILE%` + `wslpath -u` |
-| terminal shell | `wsl.exe` | chosen by `vscode.env.remoteName` |
-
-**5. Per-distro metrics.** On WSL 2 every distro shares one VM but has its own
-PID namespace, so summing `/proc/<pid>/stat` inside a distro gives that distro's
-usage. One long-lived `sh` loop per expanded distro streams samples instead of
-spawning `wsl.exe` on every tick. Memory is the sum of process RSS, so shared
-pages are counted more than once.
-
-That loop is shared by every VS Code window: the first window to expand a distro
-takes a lock file in `%TEMP%\wsl-distro-manager` and writes each sample there;
-other windows read it. When that window stops, another takes over. A takeover
-never relies on file times, because the WSL VM clock can drift seconds away from
-Windows.
-
-**6. Interop can vanish.** When a distro stops (*Stop*, idle timeout), the
-`WSLInterop` binfmt entry that lets Linux run `.exe` files is removed, and since
-all distros share one kernel, every other running distro loses interop too.
-WSL already neutralizes `systemd-binfmt --unregister`, and the entry still goes,
-so nothing inside a distro prevents it. The extension puts it back: right after
-its own *Stop* and *Unregister*, whenever a refresh shows that a distro stopped,
-and on demand with **Repair Windows Interop** (view menu `...`). If the extension
-itself runs inside WSL when this happens, it reports the problem and the fix.
-
-**7. Started distros stop on their own.** WSL stops a distro about 15 seconds
-after its last `wsl.exe` session ends, even with systemd. *Start* therefore boots
-the distro and leaves an idle `sleep` session running in it, which keeps it up
-(even after VS Code closes) until *Stop*, *Restart*, or a shutdown. That session
-is launched with PowerShell's `Start-Process -WindowStyle Hidden`: a `wsl.exe`
-spawned detached from Node has no console and opens one, which Windows 11 shows
-as a Windows Terminal window; spawned attached, it dies with the extension host.
-
-## Development
-
-```bash
-npm install
-npm run watch   # or: npm run compile
-```
-
-Open the folder in VS Code and press **F5** to launch the Extension Development
-Host. The **WSL Distro Manager** icon appears in the activity bar of the new window.
-
-If it does not, run `Developer: Show Running Extensions` in the development
-window to check whether `wsl-distro-manager` loaded, and `Help > Toggle Developer
-Tools` for activation errors. After recompiling, reload the development window
-with `Ctrl+R`.
-
-Unit tests use the built-in Node.js test runner (Node 22+) with a minimal mock of
-the `vscode` module, so they run without launching VS Code:
-
-```bash
-npm test
-```
-
-They cover the parsing of `wsl.exe`, `reg.exe`, and sampling output, path
-conversion, current-window detection, managed-distro detection, and the
-CPU/memory math. Fixtures are real `wsl.exe` output, including UTF-16LE without a
-BOM and a localized `STATE` column.
-
-A read-only smoke test calls the real functions against your WSL installation.
-From a WSL shell, `smoke:windows` also runs it (and the unit tests) on the
-Windows host, using the Node.js runtime bundled with VS Code:
-
-```bash
-npm run smoke            # on this host
-npm run smoke:windows    # on the Windows host, from WSL
-```
-
-See [TESTING.md](TESTING.md) for the manual checklist before a release.
-
-To package:
-
-```bash
-npm run package
-```
+Bug reports and pull requests are welcome on
+[GitHub](https://github.com/edtroleis/vscode-wsl-distro-manager/issues). See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the development setup, and
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the extension works
+around WSL's quirks.
 
 ## License
 

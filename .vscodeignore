@@ -8,5 +8,6 @@ tsconfig.json
 out/test/**
 .github/**
 scripts/**
-TESTING.md
+docs/**
+CONTRIBUTING.md
 images/**
