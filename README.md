@@ -44,6 +44,10 @@ themselves.
 - Edit a distro's `/etc/wsl.conf` (saved as root) and the global `.wslconfig`.
   On save, the extension offers the step that applies the change.
 
+Every action is one right-click away:
+
+![Context menu of a distro: open in a new window or terminal; stop and restart; set as default, edit wsl.conf, convert; export, compact disk, move; back up folders, send files; copy name; unregister.](images/context-menu.png)
+
 **Stay safe**
 - Destructive actions ask first; unregistering requires typing the distro name.
 - Actions that would disconnect a VS Code window from WSL are refused or

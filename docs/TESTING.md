@@ -108,4 +108,4 @@ publishing.
 | `compact.png` | The VHDX row with reclaimable space and the *Compact Disk* confirmation. |
 | `compact-shutdown.png` | The confirmation to shut WSL down for a compaction. |
 | `compact-progress.png` | The compaction progress with the elapsed time. |
-| `context-menu.png` *(to take)* | The context menu of a distro, for the Features section of the README. |
+| `context-menu.png` | The context menu of a running distro. |
