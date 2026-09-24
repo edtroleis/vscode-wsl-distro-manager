@@ -42,6 +42,8 @@ Windows host.
 - [ ] A distro started outside VS Code (e.g. Windows Terminal) turns green within the refresh interval.
 - [ ] Expanding a running distro shows CPU, memory, and processes updating every ~2 s.
 - [ ] Collapsing it, or hiding the view, stops the updates (rows show **paused**).
+- [ ] With two VS Code windows showing the same expanded distro, both update, and only one sampling `wsl.exe` runs.
+- [ ] Stopping a distro while another runs: interop keeps working in the other one (`cmd.exe /c ver` in its terminal), or is restored within a refresh; **Repair Windows Interop** reports it.
 - [ ] The **VHDX** row of a running distro shows reclaimable space only when the gap is at least 2 GB and 10% of the used space.
 - [ ] Podman / Docker distros show the tool name, and their context menu has no *Set as Default*, *Edit /etc/wsl.conf*, *Convert*, or *Compact Disk*.
 - [ ] *Stop* on a Podman / Docker distro warns that it is managed by that tool.
@@ -72,7 +74,7 @@ when the UI changes:
 | File | What it shows |
 |---|---|
 | `overview.png` | Several distros, one expanded and running: live CPU/memory, details, reclaimable VHDX space (over the threshold), Podman labels. |
-| `context-menu.png` | The right-click menu of a distro. |
+| `context-menu.png` | The right-click menu of a distro. **Retake:** it still shows *Open Terminal as Root*, which was removed. |
 | `compact.png` | The VHDX row with reclaimable space and the *Compact Disk* confirmation. |
 | `compact-shutdown.png` | The confirmation to shut WSL down for the compaction. |
 | `compact-progress.png` | The progress notification with the elapsed time. |

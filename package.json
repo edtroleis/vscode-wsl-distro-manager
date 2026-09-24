@@ -83,6 +83,11 @@
         "icon": "$(debug-stop)"
       },
       {
+        "command": "wslManager.repairInterop",
+        "title": "Repair Windows Interop",
+        "category": "WSL Distro Manager"
+      },
+      {
         "command": "wslManager.editWslConfig",
         "title": "Edit .wslconfig (Global)",
         "category": "WSL Distro Manager",
@@ -105,11 +110,6 @@
         "title": "Open Terminal",
         "category": "WSL Distro Manager",
         "icon": "$(terminal)"
-      },
-      {
-        "command": "wslManager.openTerminalAsRoot",
-        "title": "Open Terminal as Root",
-        "category": "WSL Distro Manager"
       },
       {
         "command": "wslManager.start",
@@ -191,6 +191,11 @@
           "command": "wslManager.import",
           "when": "view == wslManager.distros",
           "group": "1_manage@1"
+        },
+        {
+          "command": "wslManager.repairInterop",
+          "when": "view == wslManager.distros",
+          "group": "2_interop@1"
         }
       ],
       "view/item/context": [
@@ -223,11 +228,6 @@
           "command": "wslManager.openTerminal",
           "when": "view == wslManager.distros && viewItem =~ /^wslDistro/",
           "group": "1_open@2"
-        },
-        {
-          "command": "wslManager.openTerminalAsRoot",
-          "when": "view == wslManager.distros && viewItem =~ /^wslDistro/",
-          "group": "1_open@3"
         },
         {
           "command": "wslManager.start",

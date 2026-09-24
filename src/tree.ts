@@ -2,7 +2,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { DistroMonitor, formatBytes } from './monitor';
-import { Distro, isCurrentWindowDistro, list, managedBy, registryInfo, runtimeInfo, toHostPath } from './wsl';
+import { Distro, isCurrentWindowDistro, list, managedBy, registryInfo, restoreInterop, runtimeInfo, toHostPath } from './wsl';
 
 /**
  * How much a compaction would likely give back, or undefined when it is not
@@ -166,6 +166,10 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 	/** Expanded distros by name, since a state change gives the item a new id. */
 	private readonly expanded = new Set<string>();
 
+	/** Running distros at the last refresh, to notice distros that stopped. */
+	private lastRunning: Set<string> | undefined;
+	private restoringInterop = false;
+
 	refresh(): void {
 		this.changed.fire();
 	}
@@ -184,7 +188,9 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 		try {
 			const distros = await list();
 			this.loaded.fire(distros);
-			this.stopMonitorsExcept(new Set(distros.filter((d) => d.running).map((d) => d.name)));
+			const running = new Set(distros.filter((d) => d.running).map((d) => d.name));
+			this.stopMonitorsExcept(running);
+			this.healInteropIfSomethingStopped(running);
 			const showManaged = vscode.workspace
 				.getConfiguration('wslManager')
 				.get<boolean>('showManagedDistros', true);
@@ -195,6 +201,29 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 			const message = error instanceof Error ? error.message : String(error);
 			return [new MessageItem(`Failed to query wsl.exe: ${message}`, 'error')];
 		}
+	}
+
+	/**
+	 * A distro that stops, for whatever reason (Stop, idle timeout), takes
+	 * Windows interop away from every other running distro. When a refresh
+	 * shows that a distro stopped, re-register it in the ones still running.
+	 */
+	private healInteropIfSomethingStopped(running: Set<string>): void {
+		const previous = this.lastRunning;
+		this.lastRunning = running;
+		const stopped = previous ? [...previous].some((name) => !running.has(name)) : false;
+		if (!stopped || running.size === 0 || this.restoringInterop) {
+			return;
+		}
+		this.restoringInterop = true;
+		restoreInterop([...running])
+			.then((restored) => {
+				if (restored.length > 0) {
+					vscode.window.setStatusBarMessage(`$(check) Restored Windows interop in ${restored.join(', ')}`, 8000);
+				}
+			})
+			.catch(() => undefined)
+			.finally(() => (this.restoringInterop = false));
 	}
 
 	/** Drops the details cache; used by the manual refresh. */

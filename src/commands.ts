@@ -169,6 +169,18 @@ async function confirmShutdownForCompaction(
 	return choice === 'Shut Down and Compact';
 }
 
+/**
+ * Stopping a distro unregisters Windows interop in the other running distros
+ * (see wsl.restoreInterop). Put it back right after our own stops.
+ */
+async function healInteropAfterStop(): Promise<void> {
+	const running = (await wsl.list()).filter((d) => d.running).map((d) => d.name);
+	const restored = await wsl.restoreInterop(running).catch(() => []);
+	if (restored.length > 0) {
+		vscode.window.setStatusBarMessage(`$(check) Restored Windows interop in ${restored.join(', ')}`, 8000);
+	}
+}
+
 function withProgress<T>(title: string, task: () => Promise<T>): Thenable<T> {
 	return vscode.window.withProgress(
 		{ location: vscode.ProgressLocation.Notification, title, cancellable: false },
@@ -210,25 +222,22 @@ export function registerCommands(
 		});
 	});
 
-	const openTerminal = async (arg: unknown, asRoot: boolean) => {
+	register('wslManager.openTerminal', async (arg: unknown) => {
 		const distro = await resolveDistro(arg, 'Open a terminal in which distro?');
 		if (!distro) {
 			return;
 		}
-		const user = asRoot ? 'root' : config().get<string>('defaultUser', '');
+		const user = config().get<string>('defaultUser', '');
 		const args = ['--distribution', distro.name, ...(user ? ['--user', user] : [])];
 		const terminal = vscode.window.createTerminal({
-			name: asRoot ? `${distro.name} (root)` : distro.name,
+			name: distro.name,
 			shellPath: terminalWslPath(),
 			shellArgs: args,
 			iconPath: new vscode.ThemeIcon('terminal-linux'),
 		});
 		terminal.show();
 		tree.refresh();
-	};
-
-	register('wslManager.openTerminal', (arg: unknown) => openTerminal(arg, false));
-	register('wslManager.openTerminalAsRoot', (arg: unknown) => openTerminal(arg, true));
+	});
 
 	register('wslManager.start', async (arg: unknown) => {
 		const distro = await resolveDistro(arg, 'Start which distro?', (d) => !d.running);
@@ -252,7 +261,10 @@ export function registerCommands(
 		if (!ok) {
 			return;
 		}
-		await withProgress(`Stopping ${distro.name}...`, () => wsl.terminate(distro.name));
+		await withProgress(`Stopping ${distro.name}...`, async () => {
+			await wsl.terminate(distro.name);
+			await healInteropAfterStop();
+		});
 		tree.refresh();
 	});
 
@@ -412,7 +424,10 @@ export function registerCommands(
 		if (typed !== distro.name) {
 			return;
 		}
-		await withProgress(`Unregistering ${distro.name}...`, () => wsl.unregister(distro.name));
+		await withProgress(`Unregistering ${distro.name}...`, async () => {
+			await wsl.unregister(distro.name);
+			await healInteropAfterStop();
+		});
 		vscode.window.showInformationMessage(`"${distro.name}" was unregistered.`);
 		tree.refresh();
 	});
@@ -527,6 +542,7 @@ export function registerCommands(
 						{ tolerateFailure: true },
 					);
 					await wsl.terminate(distro.name);
+					await healInteropAfterStop();
 				}
 				return wsl.waitUntilUnlocked(vhd, 5000);
 			});
@@ -595,6 +611,16 @@ export function registerCommands(
 			tree.invalidateDetails();
 			tree.refresh();
 		}
+	});
+
+	register('wslManager.repairInterop', async () => {
+		const running = (await wsl.list()).filter((d) => d.running).map((d) => d.name);
+		const restored = await withProgress('Checking Windows interop...', () => wsl.restoreInterop(running));
+		vscode.window.showInformationMessage(
+			restored.length > 0
+				? `Restored Windows interop in ${restored.join(', ')}.`
+				: 'Windows interop is working in every running distro.',
+		);
 	});
 
 	register('wslManager.copyName', async (arg: unknown) => {

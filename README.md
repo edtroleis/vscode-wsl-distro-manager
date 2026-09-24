@@ -24,7 +24,7 @@ official extension does not: start/stop, `--set-default`, export/import,
 | Export / Import (`.tar` or `.vhdx`) | `wsl --export` / `wsl --import` |
 | Unregister a distro | `wsl --unregister <d>` |
 | Shut down WSL | `wsl --shutdown` |
-| Open a terminal (default user or root) | `wsl -d <d> [-u <user>]` |
+| Open a terminal | `wsl -d <d> [-u <user>]` |
 | Open a new connected window | authority `wsl+<d>` |
 | Edit the distro's `/etc/wsl.conf` | `wsl -d <d> -u root` |
 | Edit the global `.wslconfig` | `%USERPROFILE%\.wslconfig` |
@@ -140,12 +140,20 @@ usage. One long-lived `sh` loop per expanded distro streams samples instead of
 spawning `wsl.exe` on every tick. Memory is the sum of process RSS, so shared
 pages are counted more than once.
 
-**6. Interop can vanish.** When a distro that uses systemd stops, its
-`systemd-binfmt` unregisters the `WSLInterop` binfmt entry, and since all distros
-share one kernel, every other running distro loses the ability to run `.exe`
-files. Running `wsl.exe` then fails with shell errors instead of a clear message.
-When the extension runs inside WSL and this happens, it reports the problem and
-the one-line fix (re-registering `WSLInterop`).
+That loop is shared by every VS Code window: the first window to expand a distro
+takes a lock file in `%TEMP%\wsl-distro-manager` and writes each sample there;
+other windows read it. When that window stops, another takes over. A takeover
+never relies on file times, because the WSL VM clock can drift seconds away from
+Windows.
+
+**6. Interop can vanish.** When a distro stops (*Stop*, idle timeout), the
+`WSLInterop` binfmt entry that lets Linux run `.exe` files is removed, and since
+all distros share one kernel, every other running distro loses interop too.
+WSL already neutralizes `systemd-binfmt --unregister`, and the entry still goes,
+so nothing inside a distro prevents it. The extension puts it back: right after
+its own *Stop* and *Unregister*, whenever a refresh shows that a distro stopped,
+and on demand with **Repair Windows Interop** (view menu `...`). If the extension
+itself runs inside WSL when this happens, it reports the problem and the fix.
 
 **7. Started distros stop on their own.** WSL stops a distro about 15 seconds
 after its last `wsl.exe` session ends, even with systemd. *Start* therefore boots

@@ -55,9 +55,9 @@ export interface RunResult {
 
 export const INTEROP_BROKEN_MESSAGE =
 	'Windows interop is disabled in this distro, so it cannot run wsl.exe. This is a known WSL issue: ' +
-	'when another distro that uses systemd stops, it unregisters interop for every distro. Restore it with: ' +
-	'sudo sh -c "echo :WSLInterop:M::MZ::/init:PF > /proc/sys/fs/binfmt_misc/register" ' +
-	'(or restart WSL from Windows).';
+	'when a distro stops, interop is unregistered in every other running distro. Run "Repair Windows ' +
+	'Interop" from a local VS Code window, or restore it here with: ' +
+	'sudo sh -c "echo :WSLInterop:M::MZ::/init:P > /proc/sys/fs/binfmt_misc/register"';
 
 /**
  * On the Linux host, Windows programs run through a binfmt_misc entry that WSL
@@ -595,4 +595,31 @@ export function parseVscodeConnectedDistros(commandLines: string): string[] {
 		}
 	}
 	return [...distros];
+}
+
+/**
+ * The binfmt_misc entry WSL registers so Linux can run Windows .exe files,
+ * written exactly as WSL's own systemd override writes it. binfmt_misc belongs
+ * to the kernel all distros share, and when a distro stops (Stop, idle
+ * timeout) the entry is removed for every other running distro too. WSL
+ * already neutralizes systemd-binfmt's --unregister, and the entry still goes,
+ * so nothing inside a distro prevents it; it can only be put back.
+ */
+const INTEROP_REGISTRATION = ':WSLInterop:M::MZ::/init:P';
+
+/** Re-registers interop where it is missing. Returns the distros where it was restored. */
+export async function restoreInterop(distros: string[]): Promise<string[]> {
+	const script =
+		"ls /proc/sys/fs/binfmt_misc 2>/dev/null | grep -q '^WSLInterop' && exit 0; " +
+		`echo '${INTEROP_REGISTRATION}' > /proc/sys/fs/binfmt_misc/register && echo restored`;
+	const restored: string[] = [];
+	for (const distro of distros) {
+		const result = await run(['--distribution', distro, '--user', 'root', '--exec', '/bin/sh', '-c', script], {
+			tolerateFailure: true,
+		});
+		if (result.stdout.includes('restored')) {
+			restored.push(distro);
+		}
+	}
+	return restored;
 }
