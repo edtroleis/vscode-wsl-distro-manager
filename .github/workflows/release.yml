@@ -27,6 +27,8 @@ jobs:
     environment: marketplace
     permissions:
       contents: write
+      # Only for signing in to Azure with OIDC (Entra ID); no secret involved.
+      id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -46,11 +48,35 @@ jobs:
         if: steps.status.outputs.published == 'false'
         run: npx vsce package --out "vscode-wsl-distro-manager-${{ steps.status.outputs.version }}.vsix"
 
+      # Two ways to authenticate, see CONTRIBUTING.md > Releases:
+      # - Microsoft Entra ID (recommended): the variables AZURE_CLIENT_ID,
+      #   AZURE_TENANT_ID, and AZURE_SUBSCRIPTION_ID of a managed identity that
+      #   is a member of the publisher. Short-lived credentials, nothing stored.
+      # - An organization-scoped Azure DevOps token in the secret VSCE_PAT.
+      #   Global tokens stop working on 2026-12-01.
+      - name: Sign in to Azure (Entra ID)
+        if: steps.status.outputs.published == 'false' && vars.AZURE_CLIENT_ID != ''
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
       - name: Publish to the Marketplace
         if: steps.status.outputs.published == 'false'
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npx vsce publish --packagePath "vscode-wsl-distro-manager-${{ steps.status.outputs.version }}.vsix"
+          USE_ENTRA: ${{ vars.AZURE_CLIENT_ID != '' }}
+          VSIX: vscode-wsl-distro-manager-${{ steps.status.outputs.version }}.vsix
+        run: |
+          if [ "$USE_ENTRA" = "true" ]; then
+            npx vsce publish --azure-credential --packagePath "$VSIX"
+          elif [ -n "$VSCE_PAT" ]; then
+            npx vsce publish --packagePath "$VSIX"
+          else
+            echo "::error::No Marketplace credentials. Set the AZURE_* variables (Entra ID) or the VSCE_PAT secret in the marketplace environment; see CONTRIBUTING.md."
+            exit 1
+          fi
 
       - name: Tag and create the GitHub release
         if: steps.status.outputs.published == 'false'

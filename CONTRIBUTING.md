@@ -134,19 +134,65 @@ uploads it as the `vsix` artifact of each run), and retake the screenshots in
 
 ### Setup (once)
 
-1. Create a publisher `edtroleis` at
-   <https://marketplace.visualstudio.com/manage>.
-2. Create an Azure DevOps Personal Access Token with **Organization: All
-   accessible organizations** and the scope **Marketplace > Manage**.
-3. Store it as the `VSCE_PAT` secret of the repository:
+The **Release** workflow publishes from the `marketplace` environment, which
+only `main` may use (Settings > Environments). Give it credentials in one of
+two ways.
+
+#### Option A: Microsoft Entra ID (recommended)
+
+GitHub Actions signs in to Azure with OIDC and gets a short-lived token; no
+secret is stored. It needs an Azure subscription (a free one works; a managed
+identity costs nothing).
+
+1. Create a user-assigned managed identity:
 
    ```bash
-   gh secret set VSCE_PAT --repo edtroleis/vscode-wsl-distro-manager
+   az group create --name vscode-publish --location eastus
+   az identity create --name vscode-wsl-distro-manager-publisher --resource-group vscode-publish
    ```
 
-4. Protect `main` so changes arrive through pull requests with CI passing
-   (Settings > Branches, or `gh api`), requiring the checks *Test
-   (ubuntu-latest)*, *Test (windows-latest)*, and *Version not yet published*.
+   Note its `clientId`, `tenantId`, and `id` (the resource ID).
+2. Let this repository's `marketplace` environment sign in as it:
 
-The token expires; when publishing fails with an authentication error, create a
-new one and run step 3 again.
+   ```bash
+   az identity federated-credential create \
+     --name github-marketplace \
+     --identity-name vscode-wsl-distro-manager-publisher \
+     --resource-group vscode-publish \
+     --issuer https://token.actions.githubusercontent.com \
+     --subject repo:edtroleis/vscode-wsl-distro-manager:environment:marketplace \
+     --audiences api://AzureADTokenExchange
+   ```
+
+3. At <https://marketplace.visualstudio.com/manage/publishers/edtroleis>,
+   open **Members** and add the identity by its resource ID, with the
+   **Contributor** role.
+4. Store the IDs as variables of the environment (they are not secrets):
+
+   ```bash
+   gh variable set AZURE_CLIENT_ID --env marketplace --body <clientId>
+   gh variable set AZURE_TENANT_ID --env marketplace --body <tenantId>
+   gh variable set AZURE_SUBSCRIPTION_ID --env marketplace --body <subscriptionId>
+   ```
+
+#### Option B: Azure DevOps token
+
+1. In an Azure DevOps organization (create a free one if needed), create a
+   Personal Access Token for **that organization** with the scope
+   **Marketplace > Manage**. Global tokens (*All accessible organizations*)
+   stop working on 2026-12-01.
+2. Store it as a secret of the environment; the command asks for the value:
+
+   ```bash
+   gh secret set VSCE_PAT --env marketplace --repo edtroleis/vscode-wsl-distro-manager
+   ```
+
+The token expires. When publishing fails with an authentication error,
+create a new one and run step 2 again. With both options set, the workflow
+uses Entra ID.
+
+#### Protect main
+
+Require pull requests with CI passing before merging to `main` (Settings >
+Branches), with the checks *Test (ubuntu-latest)*, *Test (windows-latest)*,
+and *Version not yet published*.
