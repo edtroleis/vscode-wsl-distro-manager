@@ -3,59 +3,65 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/edtroleis/vscode-wsl-distro-manager/ci.yml?branch=main&label=CI)](https://github.com/edtroleis/vscode-wsl-distro-manager/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Manage your Windows Subsystem for Linux distros from the VS Code sidebar. Start
-and stop them, watch their CPU and memory, install, move, and back them up,
-reclaim disk space, and edit their configuration, without leaving the editor.
+Keep your WSL distros healthy from the VS Code sidebar. See what each distro
+uses right now, give unused disk space back to Windows, back up the folders
+that matter, and start, stop, install, or move distros without breaking the
+tools and windows that depend on them.
 
 ![The WSL Distro Manager view with the default distro expanded: live CPU, memory, and process count, OS and disk details, and about 8.4 GB of reclaimable disk space. Podman distros are labeled.](images/overview.png)
 
 WSL Distro Manager complements Microsoft's **WSL** extension
 ([`ms-vscode-remote.remote-wsl`](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-wsl)),
-which connects VS Code to a distro. This extension manages the distros
+which connects VS Code to a distro. This extension looks after the distros
 themselves.
+
+> WSL Distro Manager is a community project. It is not affiliated with,
+> endorsed by, or supported by Microsoft. Windows, Windows Subsystem for Linux,
+> WSL, and Visual Studio Code are trademarks of Microsoft Corporation.
 
 ## Features
 
-**See every distro at a glance**
+**Watch every distro**
+- Live CPU, memory, and process count for running distros, shared by every
+  VS Code window.
 - State, WSL version, and default distro, refreshed automatically.
 - Expand a distro for its OS, kernel, default user, disk usage, install
   location, and virtual disk (VHDX) size.
-- Live CPU, memory, and process count for running distros.
-
-**Control them**
-- Start, stop, and restart. A started distro stays running until you stop it;
-  WSL would otherwise stop it about 15 seconds later.
-- Open a terminal, or a new VS Code window connected to the distro.
-- Set the default distro, convert between WSL 1 and WSL 2, or shut down WSL.
-
-**Install, move, and back up**
-- Install distros from the official online catalog, with the name and location
-  you choose.
-- Export and import (`.tar` or `.vhdx`), with progress and cancel.
-- Move a distro's disk to another folder or drive.
-- Back up chosen folders to a `.tar.gz` or `.zip` on Windows, and send Windows
-  files into a distro, restoring backups in place.
 
 **Reclaim disk space**
 - See how much space a distro's virtual disk holds beyond what it uses, and
-  compact it to give that space back to Windows.
+  compact it to give that space back to Windows. The estimate appears only
+  when compaction is worth it.
 
-**Configure**
-- Edit a distro's `/etc/wsl.conf` (saved as root) and the global `.wslconfig`.
-  On save, the extension offers the step that applies the change.
+**Back up what matters**
+- Back up chosen folders to a `.tar.gz` or `.zip` on your Windows Desktop,
+  without exporting the whole distro.
+- Send Windows files into a distro, and restore backups in place.
+- Export and import whole distros (`.tar` or `.vhdx`), with progress and
+  cancel.
+
+**Stay safe**
+- Nothing shuts WSL down while VS Code windows are connected to it; actions
+  that would disconnect a window are refused or confirmed explicitly.
+- Distros owned by Docker Desktop, Podman, or Rancher Desktop are labeled and
+  protected.
+- Windows interop, which WSL removes from running distros when one stops, is
+  repaired automatically (see [Troubleshooting](#troubleshooting)).
+- Destructive actions ask first; unregistering requires typing the distro name.
+
+**Control and organize**
+- Start, stop, and restart. A started distro stays running until you stop it;
+  WSL would otherwise stop it about 15 seconds later.
+- Open a terminal, or a new VS Code window connected to the distro.
+- Install distros from the official online catalog, with the name and location
+  you choose, and move a distro's disk to another folder or drive.
+- Set the default distro, convert between WSL 1 and WSL 2, or shut down WSL.
+- Edit a distro's `/etc/wsl.conf` (saved as root) and the global `.wslconfig`;
+  on save, the extension offers the step that applies the change.
 
 Every action is one right-click away:
 
 ![Context menu of a distro: open in a new window or terminal; stop and restart; set as default, edit wsl.conf, convert; export, compact disk, move; back up folders, send files; copy name; unregister.](images/context-menu.png)
-
-**Stay safe**
-- Destructive actions ask first; unregistering requires typing the distro name.
-- Actions that would disconnect a VS Code window from WSL are refused or
-  confirmed explicitly.
-- Distros owned by Docker Desktop, Podman, or Rancher Desktop are labeled and
-  protected.
-- Repairs Windows interop when WSL removes it (see
-  [Troubleshooting](#troubleshooting)).
 
 ## Requirements
 

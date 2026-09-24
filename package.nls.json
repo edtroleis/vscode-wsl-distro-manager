@@ -1,5 +1,5 @@
 {
-  "description": "Manage WSL distros from the sidebar: start and stop them, watch CPU and memory, install, move, export, and back them up, reclaim disk space, and edit .wslconfig and wsl.conf.",
+  "description": "Keep your WSL distros healthy from the sidebar: live CPU and memory, disk space reclaim, folder backups, and safe start, stop, install, move, export, and import.",
   "welcome": "No WSL distros found.\n[Install Distro](command:wslManager.install)\n[Import Distro](command:wslManager.import)\n[Refresh](command:wslManager.refresh)",
   "command.refresh": "Refresh",
   "command.shutdown": "Shut Down WSL (wsl --shutdown)",

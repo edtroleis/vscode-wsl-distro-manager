@@ -30,11 +30,13 @@
     "windows subsystem for linux",
     "distro",
     "linux",
-    "wslconfig",
-    "wsl.conf",
+    "disk space",
     "vhdx",
+    "compact",
     "backup",
-    "compact"
+    "monitor",
+    "wslconfig",
+    "wsl.conf"
   ],
   "extensionKind": [
     "ui",
