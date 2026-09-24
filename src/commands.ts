@@ -11,6 +11,7 @@ import { registerTransferCommands } from './transfer';
 import { offerInteropRepair, repairInterop } from './interop';
 import { DistroItem, DistroTreeProvider, InfoItem, estimateReclaimable } from './tree';
 import { globalUri } from './configFs';
+import { log } from './log';
 
 function config() {
 	return vscode.workspace.getConfiguration('wslManager');
@@ -284,6 +285,7 @@ export function registerCommands(
 					await handler(...args);
 				} catch (error) {
 					const message = error instanceof Error ? error.message : String(error);
+					log().error(`${id}: ${message}`);
 					vscode.window.showErrorMessage(vscode.l10n.t('WSL: {0}', message));
 					tree.refresh();
 				}
@@ -368,6 +370,8 @@ export function registerCommands(
 		}
 		await withProgress(vscode.l10n.t('Restarting {0}...', distro.name), async () => {
 			await wsl.terminate(distro.name);
+			// Stopping it removed interop from the other running distros.
+			healInteropAfterStop();
 			await wsl.start(distro.name);
 		});
 		tree.refresh();
@@ -409,7 +413,11 @@ export function registerCommands(
 		const expected = isVhd ? disk?.size : used;
 		const exported = await withFileProgress(vscode.l10n.t('Exporting {0}', distro.name), targetHost, expected, (signal) =>
 			wsl.exportDistro(distro.name, targetPath, isVhd, signal),
-		);
+		).catch(async (error: unknown) => {
+			// A failed export leaves a truncated file that looks like a backup.
+			await fs.rm(targetHost, { force: true });
+			throw error;
+		});
 		if (exported === undefined) {
 			await fs.rm(targetHost, { force: true });
 			vscode.window.showInformationMessage(vscode.l10n.t('Export of "{0}" cancelled; the partial file was removed.', distro.name));

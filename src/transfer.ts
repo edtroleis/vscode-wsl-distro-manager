@@ -365,8 +365,9 @@ interface PathItem extends vscode.QuickPickItem {
  * Picks what to back up from the default user's home. File dialogs cannot
  * browse \\wsl.localhost (VS Code blocks UNC hosts), so this is a quick pick
  * that navigates folders: checking a folder takes all of it; its ➔ button opens
- * it to choose items inside, where the first row takes the whole folder. The
- * ↑ button goes up. Choices in every folder are kept until OK. Typed paths
+ * it to choose items inside, where "Everything in ..." takes the whole folder
+ * and "Back to ..." (or ← in the title) goes up. Choices in every folder are
+ * kept until OK. Typed paths
  * (relative or absolute) are asked for afterwards when "Type paths" is checked.
  */
 export async function pickHomePaths(

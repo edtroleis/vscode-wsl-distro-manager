@@ -7,6 +7,7 @@ import { log } from './log';
 
 export function activate(context: vscode.ExtensionContext): void {
 	// First in the log, so a log attached to a problem report names the version.
+	context.subscriptions.push(log());
 	log().info(`Distro Manager for WSL ${version(context)} on ${process.platform}, VS Code ${vscode.version}`);
 	initPending(context);
 	setExtensionUri(context.extensionUri);
@@ -97,6 +98,6 @@ async function about(context: vscode.ExtensionContext): Promise<void> {
 	} else if (choice === changelog) {
 		await vscode.env.openExternal(vscode.Uri.parse(`${repo}/blob/main/CHANGELOG.md`));
 	} else if (choice === issue) {
-		await vscode.env.openExternal(vscode.Uri.parse(`${repo}/issues/new`));
+		await vscode.env.openExternal(vscode.Uri.parse(`${repo}/issues/new/choose`));
 	}
 }

@@ -1,4 +1,5 @@
 import { ChildProcess, spawn } from 'child_process';
+import { randomUUID } from 'crypto';
 import * as fsSync from 'fs';
 import * as fs from 'fs/promises';
 import * as os from 'os';
@@ -575,7 +576,9 @@ export async function compactVhd(vhdWindowsPath: string, program = DISKPART, ele
 	const vhd = await asciiPath(vhdWindowsPath);
 	const tempHost = await windowsTempDir();
 	const tempWindows = await toWindowsHostPath(tempHost);
-	const logName = `wsl-distro-manager-${process.pid}-${Date.now()}.log`;
+	// Unpredictable, so no other program can prepare a file or link at that path
+	// for the elevated process to write through.
+	const logName = `wsl-distro-manager-${randomUUID()}.log`;
 	const logHost = path.join(tempHost, logName);
 	const logWindows = path.win32.join(tempWindows, logName);
 	const encoded = encodePowerShell(diskpartScript(vhd, logWindows, program));

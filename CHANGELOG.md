@@ -12,7 +12,21 @@ project follows [Semantic Versioning](https://semver.org/).
 
 - *About*, in the view's `...` menu: the version, with links to the extension
   page, the changelog, and a new issue.
-- The log in the Output panel starts with the extension's version.
+- The log in the Output panel starts with the extension's version, and
+  records failed commands.
+
+### Fixed
+
+- *Restart* checks Windows interop in the other running distros afterwards, as
+  *Stop* does.
+- A failed export removes its incomplete file.
+
+### Security
+
+- `wslExePath`, `defaultUser`, `backupFolder`, and `confirmDestructiveActions`
+  are read only from user settings. Before, a project's `.vscode/settings.json`
+  could set them, for example to make the extension run a program from the
+  project.
 
 ### Changed
 

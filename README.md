@@ -320,8 +320,12 @@ installed, the view offers *Install Distro* and *Import Distro* instead.
   `.gnupg`, ...), the extension asks first, and says so when the destination is
   synced to the cloud (for example a Desktop in OneDrive). Extract only
   archives you trust.
-- **Restricted Mode.** The extension reads and runs nothing from the workspace,
-  so it stays available in untrusted workspaces.
+- **Workspaces cannot change what runs.** The settings that choose a program
+  (`wslExePath`), a user (`defaultUser`), a destination (`backupFolder`), or
+  whether to confirm (`confirmDestructiveActions`) apply only from your user
+  settings; a project's `.vscode/settings.json` cannot set them. The extension
+  reads and runs nothing else from the workspace, so it stays available in
+  Restricted Mode.
 - **Release pipeline.** CI runs with a read-only token; the release job alone
   can write, and GitHub Actions are pinned to commit hashes.
 

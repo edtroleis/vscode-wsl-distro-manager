@@ -183,6 +183,12 @@ agrees: `sudo -n` first, which succeeds only if the distro allows it without a
 password, then `sudo -S` with the password on standard input. A default user
 that is root writes directly, as it would in its own terminal.
 
+**Settings from the user only.** The extension runs in untrusted workspaces,
+so a workspace must not steer it. The settings that name a program, a user, a
+destination, or turn off confirmations have `"scope": "machine"`, which VS Code
+reads only from user (or remote machine) settings, never from a workspace's
+`.vscode/settings.json`. A test keeps that list in place.
+
 **Programs by absolute path.** Windows programs are started from `System32`
 by full path (`system32()`), and the elevated chain names PowerShell and
 `diskpart` through `$env:SystemRoot`. A bare name would let a same-named

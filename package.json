@@ -372,6 +372,7 @@
       "title": "Distro Manager for WSL",
       "properties": {
         "wslManager.wslExePath": {
+          "scope": "machine",
           "type": "string",
           "default": "",
           "markdownDescription": "%config.wslExePath%"
@@ -389,6 +390,7 @@
           "markdownDescription": "%config.metricsIntervalSeconds%"
         },
         "wslManager.backupFolder": {
+          "scope": "machine",
           "type": "string",
           "default": "",
           "markdownDescription": "%config.backupFolder%"
@@ -409,6 +411,7 @@
           "markdownDescription": "%config.backupExcludes%"
         },
         "wslManager.defaultUser": {
+          "scope": "machine",
           "type": "string",
           "default": "",
           "description": "%config.defaultUser%"
@@ -436,6 +439,7 @@
           "markdownDescription": "%config.showManagedDistros%"
         },
         "wslManager.confirmDestructiveActions": {
+          "scope": "machine",
           "type": "boolean",
           "default": true,
           "description": "%config.confirmDestructiveActions%"
