@@ -146,8 +146,9 @@ identity costs nothing).
 
 Run the `az` commands in [Azure Cloud Shell](https://portal.azure.com/#cloudshell/)
 (Bash; already signed in), or install the Azure CLI (on Fedora,
-`sudo dnf install azure-cli`) and run `az login` first. Check the subscription
-with `az account show`.
+`sudo dnf install azure-cli`) and run `az login` first (inside WSL,
+`az login --use-device-code`, since the CLI cannot open the Windows browser).
+Check the subscription with `az account show`.
 
 1. Create a user-assigned managed identity:
 
