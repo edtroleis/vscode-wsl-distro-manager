@@ -373,7 +373,7 @@
     "test": "npm run compile && node --require ./out/test/setup.js --test \"out/test/**/*.test.js\"",
     "smoke": "npm run compile && node --require ./out/test/setup.js out/test/smoke.js",
     "smoke:windows": "npm run compile && bash scripts/smoke-windows.sh",
-    "l10n": "l10n-dev export --outDir ./l10n ./src"
+    "l10n": "vscode-l10n-dev export --outDir ./l10n ./src"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
