@@ -17,6 +17,7 @@
   "command.compact": "Compact Disk...",
   "command.move": "Move to Another Folder...",
   "command.unregister": "Unregister Distro...",
+  "command.about": "About",
   "command.copyName": "Copy Name",
   "config.wslExePath": "Path to `wsl.exe`. Empty = auto-detect (`wsl.exe` on Windows, `/mnt/c/Windows/System32/wsl.exe` when the window is connected to WSL).",
   "config.autoRefreshSeconds": "Interval, in seconds, for automatically refreshing the list while the view is visible. `0` disables it.",

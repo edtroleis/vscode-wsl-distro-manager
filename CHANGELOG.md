@@ -25,6 +25,9 @@ project follows [Semantic Versioning](https://semver.org/).
 - *Back Up Folders*: a *Back to ...* row at the top of each folder, next to the
   ← button in the title.
 - A log in the Output panel (*Distro Manager for WSL*), for reporting problems.
+  Its first line names the extension's version.
+- *About*, in the view's `...` menu: the version, with links to the extension
+  page, the changelog, and a new issue.
 
 ## [0.0.1] - 2026-09-24
 

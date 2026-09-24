@@ -17,6 +17,7 @@
   "command.compact": "Compactar Disco...",
   "command.move": "Mover para Outra Pasta...",
   "command.unregister": "Remover Distro (Unregister)...",
+  "command.about": "Sobre",
   "command.copyName": "Copiar Nome",
   "config.wslExePath": "Caminho do `wsl.exe`. Vazio = detectar automaticamente (`wsl.exe` no Windows, `/mnt/c/Windows/System32/wsl.exe` quando a janela está conectada ao WSL).",
   "config.autoRefreshSeconds": "Intervalo, em segundos, para atualizar a lista automaticamente enquanto a view está visível. `0` desativa.",

@@ -6,6 +6,8 @@ import { DistroTreeProvider, setExtensionUri } from './tree';
 import { log } from './log';
 
 export function activate(context: vscode.ExtensionContext): void {
+	// First in the log, so a log attached to a problem report names the version.
+	log().info(`Distro Manager for WSL ${version(context)} on ${process.platform}, VS Code ${vscode.version}`);
 	initPending(context);
 	setExtensionUri(context.extensionUri);
 	try {
@@ -38,6 +40,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	);
 
 	registerCommands(context, tree);
+	context.subscriptions.push(vscode.commands.registerCommand('wslManager.about', () => about(context)));
 	context.subscriptions.push(vscode.workspace.onDidSaveTextDocument(onConfigSaved));
 }
 
@@ -66,4 +69,29 @@ async function onConfigSaved(document: vscode.TextDocument): Promise<void> {
 
 export function deactivate(): void {
 	// Everything is released through context.subscriptions.
+}
+
+function version(context: vscode.ExtensionContext): string {
+	return String(context.extension.packageJSON.version ?? '?');
+}
+
+/** The version, with the way to the extension page, the changelog, and issues. */
+async function about(context: vscode.ExtensionContext): Promise<void> {
+	const repo = 'https://github.com/edtroleis/vscode-wsl-distro-manager';
+	const page = vscode.l10n.t('Extension Page');
+	const changelog = vscode.l10n.t('Changelog');
+	const issue = vscode.l10n.t('Report an Issue');
+	const choice = await vscode.window.showInformationMessage(
+		vscode.l10n.t('Distro Manager for WSL, version {0}', version(context)),
+		page,
+		changelog,
+		issue,
+	);
+	if (choice === page) {
+		await vscode.commands.executeCommand('extension.open', context.extension.id);
+	} else if (choice === changelog) {
+		await vscode.env.openExternal(vscode.Uri.parse(`${repo}/blob/main/CHANGELOG.md`));
+	} else if (choice === issue) {
+		await vscode.env.openExternal(vscode.Uri.parse(`${repo}/issues/new`));
+	}
 }

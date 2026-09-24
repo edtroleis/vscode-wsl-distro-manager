@@ -267,5 +267,9 @@
   "Nothing selected yet. Check folders or files, then OK.": "Nada selecionado ainda. Marque pastas ou arquivos e clique em OK.",
   "Another copy of Distro Manager for WSL is installed. Uninstall one of them, then reload the window.": "Há outra cópia do Distro Manager for WSL instalada. Desinstale uma delas e recarregue a janela.",
   "Back to the folder above": "Voltar para a pasta acima",
-  "Back to {0}": "Voltar para {0}"
+  "Back to {0}": "Voltar para {0}",
+  "Extension Page": "Página da Extensão",
+  "Changelog": "Histórico de Alterações",
+  "Report an Issue": "Reportar um Problema",
+  "Distro Manager for WSL, version {0}": "Distro Manager for WSL, versão {0}"
 }

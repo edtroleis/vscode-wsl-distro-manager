@@ -203,6 +203,12 @@
         "command": "wslManager.copyName",
         "title": "%command.copyName%",
         "category": "Distro Manager for WSL"
+      },
+      {
+        "command": "wslManager.about",
+        "title": "%command.about%",
+        "category": "Distro Manager for WSL",
+        "icon": "$(info)"
       }
     ],
     "menus": {
@@ -236,6 +242,11 @@
           "command": "wslManager.repairInterop",
           "when": "view == wslManager.distros",
           "group": "2_interop@1"
+        },
+        {
+          "command": "wslManager.about",
+          "when": "view == wslManager.distros",
+          "group": "9_about@1"
         }
       ],
       "view/item/context": [
