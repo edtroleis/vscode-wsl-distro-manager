@@ -1,5 +1,5 @@
 {
-  "name": "vscode-wsl-distro-manager",
+  "name": "wsl-distro-manager",
   "displayName": "WSL Distro Manager",
   "description": "%description%",
   "version": "0.0.1",

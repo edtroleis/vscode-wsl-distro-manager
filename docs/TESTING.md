@@ -33,7 +33,7 @@ VSIX...** and pick the file, or install it from WSL:
 
 ```bash
 cd "/mnt/c/Program Files/Microsoft VS Code/bin" &&
-  cmd.exe /c code.cmd --install-extension 'C:\Users\<you>\Downloads\vscode-wsl-distro-manager-<version>.vsix' --force
+  cmd.exe /c code.cmd --install-extension 'C:\Users\<you>\Downloads\wsl-distro-manager-<version>.vsix' --force
 ```
 
 Then run **Developer: Reload Window**.
