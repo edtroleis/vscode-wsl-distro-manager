@@ -8,6 +8,7 @@ Initial release.
 - Expandable distro details: OS, kernel, default user, disk usage, install location, VHDX size, and how much space a compaction would reclaim.
 - Live CPU, memory, and process count for expanded running distros.
 - Compact a distro's VHDX with diskpart to give disk space back to Windows. When WSL keeps the disk attached (any distro running), it offers to shut WSL down and restarts the distros afterwards.
+- The reclaimable-space estimate only appears when a compaction is worth it (gap of at least 2 GB and 10% of the used space); the confirmations state the expected gain and name the distros VS Code is connected to.
 - Start, stop, restart, set default, convert WSL 1/2, export, import, unregister, shut down WSL.
 - Open a terminal (default user or root) or a new VS Code window connected to a distro.
 - Edit `/etc/wsl.conf` (as root) and the global `.wslconfig`, with a prompt to apply changes on save.

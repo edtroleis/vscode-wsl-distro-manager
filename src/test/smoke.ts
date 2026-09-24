@@ -67,6 +67,8 @@ async function main(): Promise<void> {
 		await check('dialog path → wsl.exe path', () => wsl.toWindowsPath(Uri.file(temp) as never));
 	}
 
+	await check('distros with VS Code connected', () => wsl.vscodeConnectedDistros(), (d) => d.join(', ') || 'none');
+
 	for (const distro of distros ?? []) {
 		console.log(`\n${distro.name}${wsl.managedBy(distro.name) ? ` (managed by ${wsl.managedBy(distro.name)?.tool})` : ''}`);
 		const entry = registry?.get(distro.name);

@@ -1,6 +1,6 @@
 import assert = require('node:assert/strict');
 import { describe, it } from 'node:test';
-import { DistroItem, vhdxItem } from '../tree';
+import { DistroItem, estimateReclaimable, vhdxItem } from '../tree';
 import { Distro } from '../wsl';
 
 const GB = 1024 ** 3;
@@ -74,5 +74,27 @@ describe('vhdxItem', () => {
 	it('links back to its distro for the inline Compact action', () => {
 		const parent = new DistroItem(distro());
 		assert.equal(vhdxItem(parent, vhd, GB, GB).parent, parent);
+	});
+});
+
+describe('estimateReclaimable', () => {
+	// Real runs: VHDX size, used inside the distro, and what compaction gave back.
+	it('shows the gaps that paid off', () => {
+		assert.ok(estimateReclaimable(52.8 * GB, 42.9 * GB)); // reclaimed 8.7 GB
+		assert.ok(estimateReclaimable(73.7 * GB, 65.2 * GB)); // ~8.5 GB gap
+	});
+
+	it('hides gaps that are mostly file system overhead', () => {
+		assert.equal(estimateReclaimable(44.1 * GB, 42.9 * GB), undefined); // reclaimed 23 MB
+		assert.equal(estimateReclaimable(17.9 * GB, 16.0 * GB), undefined); // reclaimed 0.2 GB
+	});
+
+	it('needs at least 2 GB even on small disks', () => {
+		assert.equal(estimateReclaimable(3.5 * GB, 1.6 * GB), undefined);
+		assert.ok(estimateReclaimable(4 * GB, 1.5 * GB));
+	});
+
+	it('cannot estimate without the used space', () => {
+		assert.equal(estimateReclaimable(50 * GB, undefined), undefined);
 	});
 });

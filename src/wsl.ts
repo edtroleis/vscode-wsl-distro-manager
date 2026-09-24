@@ -562,3 +562,37 @@ export async function waitUntilUnlocked(windowsPath: string, timeoutMs: number):
 		await new Promise((r) => setTimeout(r, 1000));
 	}
 }
+
+/**
+ * Distros that VS Code windows are connected to right now, found through the
+ * Windows-side wsl.exe processes that run the VS Code server. Best effort: an
+ * empty list when it cannot tell.
+ */
+export async function vscodeConnectedDistros(): Promise<string[]> {
+	const result = await spawnCapture(
+		powershellPath(),
+		[
+			'-NoProfile',
+			'-NonInteractive',
+			'-Command',
+			"Get-CimInstance Win32_Process -Filter \"Name='wsl.exe'\" | ForEach-Object { $_.CommandLine }",
+		],
+		{ cwd: process.platform === 'win32' ? undefined : '/mnt/c', tolerateFailure: true },
+	);
+	return parseVscodeConnectedDistros(result.stdout);
+}
+
+/** Pure part of vscodeConnectedDistros(): one wsl.exe command line per line. */
+export function parseVscodeConnectedDistros(commandLines: string): string[] {
+	const distros = new Set<string>();
+	for (const line of commandLines.split(/\r?\n/)) {
+		if (!/wslServer\.sh|\.vscode-server/.test(line)) {
+			continue;
+		}
+		const match = /\s(?:-d|--distribution)\s+("([^"]+)"|\S+)/.exec(line);
+		if (match) {
+			distros.add(match[2] ?? match[1]);
+		}
+	}
+	return [...distros];
+}

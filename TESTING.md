@@ -42,7 +42,7 @@ Windows host.
 - [ ] A distro started outside VS Code (e.g. Windows Terminal) turns green within the refresh interval.
 - [ ] Expanding a running distro shows CPU, memory, and processes updating every ~2 s.
 - [ ] Collapsing it, or hiding the view, stops the updates (rows show **paused**).
-- [ ] The **VHDX** row of a running distro shows reclaimable space when it is over 1 GB.
+- [ ] The **VHDX** row of a running distro shows reclaimable space only when the gap is at least 2 GB and 10% of the used space.
 - [ ] Podman / Docker distros show the tool name, and their context menu has no *Set as Default*, *Edit /etc/wsl.conf*, *Convert*, or *Compact Disk*.
 - [ ] *Stop* on a Podman / Docker distro warns that it is managed by that tool.
 - [ ] `wslManager.showManagedDistros: false` hides them; `true` brings them back.
@@ -52,7 +52,8 @@ Windows host.
 - [ ] *Import* of that file under a new name creates a working distro; *Unregister* removes it.
 - [ ] *Compact Disk* on a distro you can spare:
   - [ ] Declining the UAC prompt shows an error and leaves the distro as it was.
-  - [ ] With another distro running, it explains that WSL must shut down, lists the running distros, and offers **Shut Down and Compact**.
+  - [ ] The first confirmation states the expected gain, or warns that there is little to reclaim.
+  - [ ] With another distro running, it explains that WSL must shut down, lists the running distros and the distros VS Code is connected to, and offers **Shut Down and Compact**.
   - [ ] That warning says every window connected to WSL will be disconnected, and the progress shows the elapsed time while diskpart runs.
   - [ ] Run from a window connected to WSL, the result offers **Reload Window**, and it reconnects the window.
   - [ ] Accepting it compacts the disk, reports the before/after size, and restarts the distros that were running (not Podman/Docker ones).
@@ -71,7 +72,7 @@ when the UI changes:
 
 | File | What it shows |
 |---|---|
-| `overview.png` | Several distros, one expanded and running: live CPU/memory, details, reclaimable VHDX space, Podman labels. |
+| `overview.png` | Several distros, one expanded and running: live CPU/memory, details, reclaimable VHDX space (over the threshold), Podman labels. |
 | `context-menu.png` | The right-click menu of a distro. |
 | `compact.png` | The VHDX row with reclaimable space and the *Compact Disk* confirmation. |
 | `compact-shutdown.png` | The confirmation to shut WSL down for the compaction. |

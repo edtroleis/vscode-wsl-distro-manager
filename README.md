@@ -8,7 +8,7 @@ which is still what connects VS Code to a distro. This one covers what the
 official extension does not: start/stop, `--set-default`, export/import,
 `--shutdown`, resource monitoring, and editing `.wslconfig` and `/etc/wsl.conf`.
 
-![WSL Distro Manager view: an expanded Ubuntu distro with live CPU, memory, and process count, OS and disk details, and reclaimable VHDX space; Podman distros are labeled](images/overview.png)
+![WSL Distro Manager view: the default distro expanded with live CPU, memory, and process count, OS and disk details, and about 8.4 GB of reclaimable VHDX space; Podman distros are labeled](images/overview.png)
 
 ## Features
 
@@ -42,7 +42,11 @@ current VS Code window always ask, even with confirmations turned off.
 A WSL 2 distro keeps its files in a VHDX that grows but never shrinks on its own:
 space freed inside the distro stays allocated on the Windows drive. When a
 running distro is expanded, the **VHDX** row shows how much a compaction would
-give back, with an inline **Compact Disk** button.
+give back, with an inline **Compact Disk** button. The estimate only appears when
+the gap between the file and the used space is at least 2 GB and 10% of the used
+space: the VHDX always holds some file system overhead beyond what `df` reports,
+so smaller gaps reclaim almost nothing (in testing, a 1.2 GB gap gave back 23 MB).
+The confirmation repeats the estimate, or warns when there is little to gain.
 
 Compacting stops the distro, asks Windows for administrator permission (UAC) to
 run `diskpart`, and starts the distro again if it was running.
@@ -55,10 +59,12 @@ case, the extension lists the running distros and asks to shut WSL down; after
 compacting, it starts them again (except Docker/Podman/Rancher distros, which
 must be started from their tool).
 
-![Confirmation to shut down WSL for the compaction, listing the running distros that will be restarted](images/compact-shutdown.png)
+![Confirmation to shut down WSL to compact a stopped distro, listing the running distros that will be restarted; behind it, the default distro shows about 8.4 GB reclaimable](images/compact-shutdown.png)
 
 The shutdown disconnects **every** VS Code window and terminal connected to WSL.
-Those windows retry while WSL is down and then give up; once compaction is done,
+The confirmation names the distros VS Code is connected to (found through the
+`wsl.exe` processes running the VS Code server). Those windows retry while WSL is
+down and then give up; once compaction is done,
 reload them (`Developer: Reload Window`). When compaction runs from a window
 connected to WSL, the result notification offers **Reload Window** for it. Run
 compaction from a local VS Code window when you can, and wait for the result

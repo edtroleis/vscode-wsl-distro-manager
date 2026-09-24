@@ -4,8 +4,21 @@ import * as vscode from 'vscode';
 import { DistroMonitor, formatBytes } from './monitor';
 import { Distro, isCurrentWindowDistro, list, managedBy, registryInfo, runtimeInfo, toHostPath } from './wsl';
 
-/** Below this, the gap between VHDX size and used space is not worth a compaction. */
-const RECLAIMABLE_THRESHOLD = 1024 ** 3;
+/**
+ * How much a compaction would likely give back, or undefined when it is not
+ * worth a WSL shutdown. The VHDX always holds a bit more than `df` reports as
+ * used (ext4 metadata, journal, reserved blocks), so a small gap is not free
+ * space: in tests, a 1.2 GB gap on 43 GB used reclaimed 23 MB and a 1.9 GB gap
+ * on 16 GB reclaimed 0.2 GB, while a 9.9 GB gap on 43 GB reclaimed 8.7 GB.
+ * Hence the bar: at least 2 GB and 10% of the used space.
+ */
+export function estimateReclaimable(vhdxSize: number, used: number | undefined): number | undefined {
+	if (used === undefined) {
+		return undefined;
+	}
+	const gap = vhdxSize - used;
+	return gap >= Math.max(2 * 1024 ** 3, used * 0.1) ? gap : undefined;
+}
 
 export class DistroItem extends vscode.TreeItem {
 	constructor(readonly distro: Distro, expanded = false) {
@@ -104,13 +117,15 @@ class ConfigFileItem extends vscode.TreeItem {
  * it runs) shows how much a compaction would give back.
  */
 export function vhdxItem(parent: DistroItem, vhdWindows: string, size: number, used: number | undefined): InfoItem {
-	const reclaimable = used !== undefined ? size - used : 0;
-	const worthIt = reclaimable >= RECLAIMABLE_THRESHOLD;
-	const value = worthIt ? `${formatBytes(size)} · ~${formatBytes(reclaimable)} reclaimable` : formatBytes(size);
+	const reclaimable = estimateReclaimable(size, used);
+	const value = reclaimable !== undefined ? `${formatBytes(size)} · ~${formatBytes(reclaimable)} reclaimable` : formatBytes(size);
 	const tooltip =
 		`${vhdWindows}\n\nFile size: ${formatBytes(size)}` +
-		(used !== undefined ? `\nUsed inside the distro: ${formatBytes(used)}` : '\nStart the distro to estimate reclaimable space.');
-	const item = new InfoItem(parent, 'VHDX', value, worthIt ? 'warning' : 'file-binary', tooltip);
+		(used === undefined
+			? '\nStart the distro to estimate reclaimable space.'
+			: `\nUsed inside the distro: ${formatBytes(used)}` +
+				(reclaimable === undefined ? '\nLittle to reclaim: compacting is not worth it now.' : ''));
+	const item = new InfoItem(parent, 'VHDX', value, reclaimable !== undefined ? 'warning' : 'file-binary', tooltip);
 	// Managed distros get no inline Compact button: their tool owns the disk.
 	item.contextValue = parent.distro.version === 2 && !managedBy(parent.distro.name) ? 'wslVhdx' : 'wslInfo';
 	return item;

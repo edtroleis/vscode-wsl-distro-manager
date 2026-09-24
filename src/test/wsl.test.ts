@@ -11,6 +11,7 @@ import {
 	parseDistroList,
 	parseRegistry,
 	parseRuntimeInfo,
+	parseVscodeConnectedDistros,
 	toWindowsPath,
 } from '../wsl';
 import * as fs from 'node:fs';
@@ -344,5 +345,32 @@ describe('interopBroken', { skip: process.platform === 'win32' }, () => {
 	it('does not guess when binfmt_misc is not mounted', () => {
 		assert.equal(interopBroken(binfmt()), false);
 		assert.equal(interopBroken('/nonexistent/binfmt_misc'), false);
+	});
+});
+
+describe('parseVscodeConnectedDistros', () => {
+	// Command lines of the wsl.exe processes VS Code runs on Windows, as seen in a real session.
+	const lines = [
+		`C:\\WINDOWS\\System32\\wsl.exe -d fedora-linux-43 sh -c '"$VSCODE_WSL_EXT_LOCATION/scripts/wslServer.sh" f6cfa2 stable code-server .vscode-server --host=127.0.0.1'`,
+		`C:\\WINDOWS\\System32\\wsl.exe -d fedora-linux-43 -e /home/user/.vscode-server/bin/f6cfa2/node -e "const net = require('net');"`,
+		`C:\\WINDOWS\\system32\\wsl.exe -d fedora-linux-43 -e /bin/sh -c "cd '/home/user/code' && /bin/sh"`,
+		`wsl.exe --distribution Ubuntu-24.04 --exec /bin/sh -c "while :; do sleep 2; done"`,
+		`"C:\\WINDOWS\\system32\\wsl.exe" --distribution FedoraLinux-43 --exec /bin/sleep 2147483647`,
+	].join('\r\n');
+
+	it('finds distros running a VS Code server, once each', () => {
+		assert.deepEqual(parseVscodeConnectedDistros(lines), ['fedora-linux-43']);
+	});
+
+	it('ignores terminals, monitors, and keep-alive sessions', () => {
+		const others = lines.split('\r\n').slice(2).join('\n');
+		assert.deepEqual(parseVscodeConnectedDistros(others), []);
+	});
+
+	it('handles --distribution and quoted names', () => {
+		assert.deepEqual(
+			parseVscodeConnectedDistros('wsl.exe --distribution "My Distro" -e /home/u/.vscode-server/bin/x/node'),
+			['My Distro'],
+		);
 	});
 });

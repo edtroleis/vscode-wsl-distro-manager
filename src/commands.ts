@@ -4,7 +4,7 @@ import * as vscode from 'vscode';
 import * as wsl from './wsl';
 import { Distro } from './wsl';
 import { formatBytes } from './monitor';
-import { DistroItem, DistroTreeProvider, InfoItem } from './tree';
+import { DistroItem, DistroTreeProvider, InfoItem, estimateReclaimable } from './tree';
 import { distroUri, globalUri } from './configFs';
 
 function config() {
@@ -141,10 +141,16 @@ export async function confirmRestartIfCurrentWindow(distro: string): Promise<boo
  * Always asks: a shutdown stops every distro, including ones this window or
  * other tools (Docker, Podman) depend on, and those are not restarted for them.
  */
-async function confirmShutdownForCompaction(distro: string, running: string[]): Promise<boolean> {
+async function confirmShutdownForCompaction(
+	distro: string,
+	running: string[],
+	connected: string[],
+	reclaimable: number | undefined,
+): Promise<boolean> {
 	const managed = running.filter((name) => wsl.managedBy(name));
 	const detail = [
-		`WSL keeps the disk of "${distro}" attached while any distro is running.`,
+		`WSL keeps the disk of "${distro}" attached while any distro is running.` +
+			(reclaimable !== undefined ? ` Expected gain: about ${formatBytes(reclaimable)}.` : ''),
 		running.length > 0
 			? `Running now: ${running.join(', ')}. They will be stopped` +
 				(running.length > managed.length ? ' and started again after the compaction.' : '.')
@@ -154,9 +160,12 @@ async function confirmShutdownForCompaction(distro: string, running: string[]): 
 					...new Set(managed.map((name) => wsl.managedBy(name)?.tool)),
 				].join(' / ')} and will not be restarted; start ${managed.length === 1 ? 'it' : 'them'} from that tool.`
 			: '',
-		'Every VS Code window and terminal connected to WSL, including this one if it is, will be ' +
-			'disconnected. Compacting a large disk can take several minutes: wait for the result ' +
-			'before reconnecting them.',
+		connected.length > 0
+			? `VS Code is connected to ${connected.join(', ')}: those windows will lose their connection ` +
+				'and need "Developer: Reload Window" after the compaction.'
+			: '',
+		'Every terminal and VS Code window connected to WSL will be disconnected. Compacting a large ' +
+			'disk can take several minutes: wait for the result before reconnecting.',
 	].filter(Boolean);
 	const choice = await vscode.window.showWarningMessage(
 		`Shut down WSL to compact "${distro}"?`,
@@ -471,11 +480,23 @@ export function registerCommands(
 		const vhdHost = await wsl.toHostPath(vhd);
 		const sizeBefore = (await fs.stat(vhdHost)).size;
 
+		// Only a running distro can report what it uses; say what to expect.
+		const used = distro.running ? (await wsl.runtimeInfo(distro.name).catch(() => undefined))?.diskUsed : undefined;
+		const reclaimable = estimateReclaimable(sizeBefore, used);
+		const expectation =
+			used === undefined
+				? 'The distro is stopped, so the space to reclaim cannot be estimated.'
+				: reclaimable !== undefined
+					? `About ${formatBytes(reclaimable)} can be reclaimed.`
+					: `Little to reclaim: the disk holds ${formatBytes(used)} and is only ${formatBytes(sizeBefore - used)} larger, ` +
+						'which is mostly file system overhead. Compacting now will likely gain almost nothing.';
+
 		const ok = await confirmDistroAction(
 			distro.name,
 			`Compact the disk of "${distro.name}" (${formatBytes(sizeBefore)})?`,
 			'Compact',
-			(distro.running ? 'The distro will be stopped while its disk is compacted, then started again. ' : '') +
+			`${expectation}\n\n` +
+				(distro.running ? 'The distro will be stopped while its disk is compacted, then started again. ' : '') +
 				'Windows will ask for administrator permission to run diskpart.',
 		);
 		if (!ok) {
@@ -515,7 +536,8 @@ export function registerCommands(
 							'window (not connected to WSL).',
 					);
 				}
-				if (!(await confirmShutdownForCompaction(distro.name, running))) {
+				const connected = await wsl.vscodeConnectedDistros().catch(() => []);
+				if (!(await confirmShutdownForCompaction(distro.name, running, connected, reclaimable))) {
 					return;
 				}
 				toRestart = [...new Set([...toRestart, ...running])].filter((name) => !wsl.managedBy(name));
