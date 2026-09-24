@@ -61,14 +61,13 @@ must be started from their tool).
 
 ![Confirmation to shut down WSL to compact a stopped distro, listing the running distros that will be restarted; behind it, the default distro shows about 8.4 GB reclaimable](images/compact-shutdown.png)
 
-The shutdown disconnects **every** VS Code window and terminal connected to WSL.
-The confirmation names the distros VS Code is connected to (found through the
-`wsl.exe` processes running the VS Code server). Those windows retry while WSL is
-down and then give up; once compaction is done,
-reload them (`Developer: Reload Window`). When compaction runs from a window
-connected to WSL, the result notification offers **Reload Window** for it. Run
-compaction from a local VS Code window when you can, and wait for the result
-before reconnecting: `diskpart` reports no progress, and a 50 GB disk takes a few minutes
+A shutdown would disconnect every VS Code window connected to WSL, and those
+windows do not reliably reconnect afterwards. So when any VS Code window is
+connected to WSL (detected through the `wsl.exe` processes running the VS Code
+server), compaction **refuses to shut WSL down**, changes nothing, and names the
+windows to close. Close them and run *Compact Disk* from a local VS Code window;
+WSL terminals are closed by the shutdown. `diskpart` reports no progress, and a
+50 GB disk takes a few minutes `diskpart` reports no progress, and a 50 GB disk takes a few minutes
 (the notification shows the elapsed time).
 
 ![Progress notification: running diskpart, 0m 14s elapsed](images/compact-progress.png)

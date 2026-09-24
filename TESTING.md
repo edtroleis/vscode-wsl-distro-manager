@@ -53,9 +53,8 @@ Windows host.
 - [ ] *Compact Disk* on a distro you can spare:
   - [ ] Declining the UAC prompt shows an error and leaves the distro as it was.
   - [ ] The first confirmation states the expected gain, or warns that there is little to reclaim.
-  - [ ] With another distro running, it explains that WSL must shut down, lists the running distros and the distros VS Code is connected to, and offers **Shut Down and Compact**.
-  - [ ] That warning says every window connected to WSL will be disconnected, and the progress shows the elapsed time while diskpart runs.
-  - [ ] Run from a window connected to WSL, the result offers **Reload Window**, and it reconnects the window.
+  - [ ] With a VS Code window connected to WSL, it refuses before shutting anything down, names that window's distro, and nothing changes (the connected window keeps working).
+  - [ ] With no window connected and another distro running, it explains that WSL must shut down, lists the running distros, and offers **Shut Down and Compact**; the progress shows the elapsed time.
   - [ ] Accepting it compacts the disk, reports the before/after size, and restarts the distros that were running (not Podman/Docker ones).
 
 ## 4. Manual checks (window connected to WSL)
