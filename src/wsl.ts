@@ -874,3 +874,13 @@ export function parseUptime(stdout: string): number | undefined {
 	const seconds = Number(stdout.trim().split(/\s+/)[0]);
 	return stdout.trim() && Number.isFinite(seconds) ? seconds : undefined;
 }
+
+/**
+ * The distros to start again after WSL shuts down: exactly those that were
+ * running, never stopped ones, and not those of Docker, Podman, or Rancher
+ * Desktop, which their tools must start (a plain `wsl -d` does not bring
+ * their services up).
+ */
+export function distrosToStartAgain(distros: Distro[]): string[] {
+	return distros.filter((d) => d.running && !managedBy(d.name)).map((d) => d.name);
+}

@@ -249,11 +249,12 @@ async function releaseDisk(
 			vscode.l10n.t('The disk of "{0}" stays attached while WSL is running, and shutting WSL down would stop this extension, which runs inside WSL. Run the command from a local VS Code window.', distro.name),
 		);
 	}
-	const running = (await wsl.list()).filter((d) => d.running).map((d) => d.name);
+	const distros = await wsl.list();
+	const running = distros.filter((d) => d.running).map((d) => d.name);
 	if (!(await confirmShutdown(distro.name, texts.shutdownTitle, texts.shutdownLabel, running, texts.shutdownDetail))) {
 		return { released: false, restart };
 	}
-	restart = [...new Set([...restart, ...running])].filter((name) => !wsl.managedBy(name));
+	restart = [...new Set([...restart, ...wsl.distrosToStartAgain(distros)])];
 	const released = await withProgress(vscode.l10n.t('Shutting down WSL...'), async () => {
 		await wsl.shutdown();
 		return wsl.waitUntilUnlocked(vhd, 15000);
@@ -565,14 +566,15 @@ export function registerCommands(
 	});
 
 	register('wslManager.restartWsl', async () => {
-		const running = (await wsl.list()).filter((d) => d.running).map((d) => d.name);
-		const toStart = running.filter((name) => !wsl.managedBy(name));
+		const distros = await wsl.list();
+		const running = distros.filter((d) => d.running).map((d) => d.name);
+		const toStart = wsl.distrosToStartAgain(distros);
 		const managed = running.filter((name) => wsl.managedBy(name));
 		const connected = await wsl.vscodeConnectedDistros().catch(() => []);
 		const detail = [
 			running.length > 0
-				? vscode.l10n.t('Running now: {0}. They stop and start again.', running.join(', '))
-				: vscode.l10n.t('No distro is running.'),
+				? vscode.l10n.t('Running now: {0}. They stop and start again; stopped distros stay stopped.', running.join(', '))
+				: vscode.l10n.t('No distro is running; they all stay stopped.'),
 			managed.length > 0
 				? vscode.l10n.t('{0} belong to Docker, Podman, or Rancher Desktop and are not started again; start them from that tool.', managed.join(', '))
 				: '',

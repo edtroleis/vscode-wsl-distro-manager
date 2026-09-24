@@ -63,7 +63,7 @@ Then run **Developer: Reload Window**.
 - [ ] The **WSL** node is first in the view and expanded; it shows *Settings (.wslconfig)* with a summary of the file (or *WSL defaults*) and *Version* with the WSL and kernel versions. Distros list no configuration files, and no menu offers to edit `/etc/wsl.conf`.
 - [ ] Clicking *Settings (.wslconfig)* opens `%USERPROFILE%\.wslconfig`; saving updates the summary and says the change applies after WSL (not Windows) restarts, with **Restart WSL Now**.
 - [ ] After saving without restarting, the row shows *restart WSL to apply* with a warning icon and an inline restart button, also after reloading the window.
-- [ ] **Restart WSL** lists the running distros, stops WSL, starts them again (not Podman/Docker ones), and the pending mark disappears.
+- [ ] **Restart WSL** lists the running distros, stops WSL, and starts again only those that were running (not Podman/Docker ones); stopped distros stay stopped, and the pending mark disappears.
 - [ ] Collapsing the **WSL** node keeps it collapsed across refreshes.
 
 ### Install, export, import, move

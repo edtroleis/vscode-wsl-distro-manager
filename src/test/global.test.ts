@@ -1,7 +1,7 @@
 import assert = require('node:assert/strict');
 import { describe, it } from 'node:test';
 import { GlobalItem, wslConfigItem, wslVersionItem } from '../tree';
-import { decode, parseUptime, parseWslConfig, parseWslVersion, summarizeWslConfig } from '../wsl';
+import { decode, distrosToStartAgain, parseUptime, parseWslConfig, parseWslVersion, summarizeWslConfig } from '../wsl';
 import { restartedSince } from '../pending';
 
 describe('parseWslVersion', () => {
@@ -121,5 +121,23 @@ describe('parseUptime', () => {
 	it('returns undefined for empty or odd output', () => {
 		assert.equal(parseUptime(''), undefined);
 		assert.equal(parseUptime('cat: /proc/uptime: No such file'), undefined);
+	});
+});
+
+describe('distrosToStartAgain', () => {
+	const d = (name: string, running: boolean) => ({ name, running, state: running ? 'Running' : 'Stopped', version: 2, isDefault: false });
+
+	it('starts again exactly the distros that were running', () => {
+		const distros = [d('fedora-linux-43', true), d('Ubuntu-24.04', false), d('FedoraLinux-43', true)];
+		assert.deepEqual(distrosToStartAgain(distros), ['fedora-linux-43', 'FedoraLinux-43']);
+	});
+
+	it('never starts a stopped distro', () => {
+		assert.deepEqual(distrosToStartAgain([d('Ubuntu-24.04', false), d('Debian', false)]), []);
+	});
+
+	it('leaves Docker, Podman, and Rancher distros to their tools, even when running', () => {
+		const distros = [d('podman-machine-default', true), d('docker-desktop', true), d('Ubuntu-24.04', true)];
+		assert.deepEqual(distrosToStartAgain(distros), ['Ubuntu-24.04']);
 	});
 });
