@@ -8,50 +8,75 @@ export interface TextPromptOptions {
 	validateInput?: (value: string) => string | undefined;
 }
 
+interface ConfirmItem extends vscode.QuickPickItem {
+	valid: boolean;
+}
+
 /**
- * Like vscode.window.showInputBox, plus a ✓ button in the title bar, so the
- * answer can be confirmed with the mouse and not only with Enter. The box stays
- * open when focus moves away, and an invalid value can be confirmed by neither.
+ * A text prompt with a visible, clickable Confirm button.
+ *
+ * showInputBox confirms only with Enter, and an input box accepts buttons only
+ * as small icons in its title bar, which did not read as a button. A quick
+ * pick keeps the text field and shows a "✓ Confirm" row right under it, with
+ * the typed value and the explanation, that a click confirms. Enter and the ✓
+ * in the title bar confirm too. When the value is invalid, the row shows why
+ * and confirms nothing. The prompt stays open when focus moves away.
  */
 export function promptText(options: TextPromptOptions): Promise<string | undefined> {
 	return new Promise((resolve) => {
-		const box = vscode.window.createInputBox();
-		box.title = options.title;
-		box.prompt = options.prompt;
-		box.value = options.value ?? '';
-		box.placeholder = options.placeHolder;
-		box.ignoreFocusOut = true;
+		const pick = vscode.window.createQuickPick<ConfirmItem>();
+		pick.title = options.title;
+		pick.placeholder = options.placeHolder;
+		pick.value = options.value ?? '';
+		pick.ignoreFocusOut = true;
+		// The row must stay visible whatever is typed, so do not filter it by the text.
+		pick.matchOnDescription = false;
+		pick.matchOnDetail = false;
 		const confirm: vscode.QuickInputButton = {
 			iconPath: new vscode.ThemeIcon('check'),
 			tooltip: vscode.l10n.t('Confirm'),
 		};
-		box.buttons = [confirm];
+		pick.buttons = [confirm];
+
+		const refresh = () => {
+			const error = options.validateInput?.(pick.value);
+			const item: ConfirmItem = error
+				? { label: `$(error) ${error}`, alwaysShow: true, valid: false }
+				: {
+						label: `$(check) ${vscode.l10n.t('Confirm')}`,
+						description: pick.value,
+						detail: options.prompt,
+						alwaysShow: true,
+						valid: true,
+					};
+			pick.items = [item];
+			pick.activeItems = [item];
+		};
 
 		let accepted = false;
-		const validate = () => {
-			box.validationMessage = options.validateInput?.(box.value);
-			return !box.validationMessage;
-		};
 		const accept = () => {
-			if (validate()) {
-				accepted = true;
-				resolve(box.value);
-				box.hide();
+			if (options.validateInput?.(pick.value)) {
+				refresh();
+				return;
 			}
+			accepted = true;
+			resolve(pick.value);
+			pick.hide();
 		};
-		box.onDidChangeValue(() => validate());
-		box.onDidAccept(accept);
-		box.onDidTriggerButton((button) => {
+		pick.onDidChangeValue(refresh);
+		pick.onDidAccept(accept);
+		pick.onDidTriggerButton((button) => {
 			if (button === confirm) {
 				accept();
 			}
 		});
-		box.onDidHide(() => {
+		pick.onDidHide(() => {
 			if (!accepted) {
 				resolve(undefined);
 			}
-			box.dispose();
+			pick.dispose();
 		});
-		box.show();
+		refresh();
+		pick.show();
 	});
 }
