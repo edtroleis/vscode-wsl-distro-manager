@@ -22,6 +22,8 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- *Back Up Folders*: a *Back to ...* row at the top of each folder, next to the
+  ← button in the title.
 - A log in the Output panel (*Distro Manager for WSL*), for reporting problems.
 
 ## [0.0.1] - 2026-09-24

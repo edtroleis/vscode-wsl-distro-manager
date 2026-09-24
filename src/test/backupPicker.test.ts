@@ -189,6 +189,23 @@ describe('backup picker (asynchronous selection events, as in VS Code)', () => {
 		assert.equal(await result, undefined);
 	});
 
+	it('goes back with the Back row, keeping what was chosen inside', async () => {
+		const picker = start();
+		const { result } = picker;
+		await settle();
+		picker.fake.openFolder('code');
+		await settle();
+		picker.fake.toggle('code/README.md');
+		await settle(100);
+		picker.fake.toggle('\0up');
+		await settle();
+		assert.ok(picker.fake.items.some((i) => i.key === 'notes.txt'), 'back in home');
+		picker.fake.toggle('notes.txt');
+		await settle(100);
+		picker.fake.accept();
+		assert.deepEqual((await result)?.paths.sort(), ['code/README.md', 'notes.txt']);
+	});
+
 	it('stays open when accepted with nothing checked, and opens the folder under the cursor', async () => {
 		const picker = start();
 		const { result } = picker;

@@ -374,13 +374,14 @@ export async function pickHomePaths(
 	listFolder: (distro: string, folder: string) => Promise<wsl.HomeEntry[]> = wsl.listFolder,
 ): Promise<{ paths: string[]; homeNames: string[] } | undefined> {
 	const TYPED = '\0typed';
+	const UP = '\0up';
 	const openButton: vscode.QuickInputButton = {
 		iconPath: new vscode.ThemeIcon('arrow-right'),
 		tooltip: vscode.l10n.t('Open, to choose items inside'),
 	};
 	const upButton: vscode.QuickInputButton = {
-		iconPath: new vscode.ThemeIcon('arrow-up'),
-		tooltip: vscode.l10n.t('Up one folder'),
+		iconPath: new vscode.ThemeIcon('arrow-left'),
+		tooltip: vscode.l10n.t('Back to the folder above'),
 	};
 	let selected: string[] = [];
 	let typed = false;
@@ -420,6 +421,8 @@ export async function pickHomePaths(
 				: vscode.l10n.t('Check to include; ➔ opens a folder to choose items inside; OK when done.');
 	};
 
+	const parent = () => (folder.includes('/') ? folder.slice(0, folder.lastIndexOf('/')) : '.');
+
 	const result = await new Promise<string[] | undefined>((resolve) => {
 		let done = false;
 
@@ -444,6 +447,12 @@ export async function pickHomePaths(
 			current.onDidChangeSelection(
 				live((selection: readonly PathItem[]) => {
 					const keys = selection.map((i) => i.key);
+					// The Back row is checkable like every row of a multi-select
+					// list; checking it goes back instead of selecting anything.
+					if (keys.includes(UP)) {
+						void open(parent());
+						return;
+					}
 					if (sameKeys(keys, uiChecked)) {
 						return;
 					}
@@ -470,13 +479,13 @@ export async function pickHomePaths(
 			current.onDidTriggerItemButton(
 				live((e: vscode.QuickPickItemButtonEvent<PathItem>) => {
 					log().info(`backup picker: item button on ${e.item.key}`);
-					void open(e.item.key);
+					void open(e.item.key === UP ? parent() : e.item.key);
 				}),
 			);
 			current.onDidTriggerButton(
 				live((button: vscode.QuickInputButton) => {
 					if (button === upButton) {
-						void open(folder.includes('/') ? folder.slice(0, folder.lastIndexOf('/')) : '.');
+						void open(parent());
 					}
 				}),
 			);
@@ -488,7 +497,9 @@ export async function pickHomePaths(
 						// Nothing to back up yet: an accept here (Enter, or a click VS Code
 						// read as one) must not close the list and silently do nothing.
 						// On a folder it opens it; elsewhere it says what to do.
-						if (active?.isDir) {
+						if (active?.key === UP) {
+							void open(parent());
+						} else if (active?.isDir) {
 							void open(active.key);
 						} else {
 							current.placeholder = vscode.l10n.t('Nothing selected yet. Check folders or files, then OK.');
@@ -509,7 +520,7 @@ export async function pickHomePaths(
 				current.dispose();
 			});
 
-			viewKeys = items.filter((i) => i.key !== TYPED).map((i) => i.key);
+			viewKeys = items.filter((i) => i.key !== TYPED && i.key !== UP).map((i) => i.key);
 			current.buttons = folder === '.' ? [] : [upButton];
 			current.items = items;
 			updateText();
@@ -552,7 +563,12 @@ export async function pickHomePaths(
 				label: `$(edit) ${vscode.l10n.t('Type paths...')}`,
 				description: vscode.l10n.t('Relative to home or absolute'),
 			};
-			create(target === '.' ? [typeRow, everything, ...rows] : [everything, ...rows]);
+			const upRow: PathItem = {
+				key: UP,
+				label: `$(arrow-left) ${vscode.l10n.t('Back to {0}', target.includes('/') ? `~/${target.slice(0, target.lastIndexOf('/'))}/` : '~/')}`,
+				buttons: [upButton],
+			};
+			create(target === '.' ? [typeRow, everything, ...rows] : [upRow, everything, ...rows]);
 		};
 
 		// A placeholder list while the home folder loads.

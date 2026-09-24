@@ -135,8 +135,9 @@ exporting the whole distro:
 
 1. Choose what to include, starting in your home folder. Check a folder to take
    all of it, or click its **➔** to open it and choose the folders and files
-   inside; its first row, *Everything in ...*, takes the whole folder again. The
-   **↑** button goes up, and choices in every folder are kept until **OK**. You
+   inside; there, *Everything in ...* takes the whole folder again, and
+   *Back to ...* (or **←** in the title) returns to the folder above. Choices in
+   every folder are kept until **OK**. You
    can also type paths (relative to your home, or absolute).
 2. Choose the format. `.tar.gz` is recommended: it keeps Linux permissions and
    symbolic links. `.zip` opens anywhere but loses them, so restored scripts are
