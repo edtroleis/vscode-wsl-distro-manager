@@ -1,7 +1,10 @@
 # Distro Manager for WSL
 
-[![Release](https://img.shields.io/github/actions/workflow/status/edtroleis/vscode-wsl-distro-manager/release.yml?branch=main&label=release)](https://github.com/edtroleis/vscode-wsl-distro-manager/actions/workflows/release.yml)
-[![Marketplace](https://img.shields.io/visual-studio-marketplace/v/edtroleis.vscode-wsl-distro-manager?label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=edtroleis.vscode-wsl-distro-manager)
+[![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.85.0-007ACC?logo=visualstudiocode&logoColor=white)](https://code.visualstudio.com/)
+[![VS Marketplace](https://vsmarketplacebadges.dev/version-short/edtroleis.vscode-wsl-distro-manager.svg)](https://marketplace.visualstudio.com/items?itemName=edtroleis.vscode-wsl-distro-manager)
+[![Installs](https://vsmarketplacebadges.dev/installs-short/edtroleis.vscode-wsl-distro-manager.svg)](https://marketplace.visualstudio.com/items?itemName=edtroleis.vscode-wsl-distro-manager)
+[![Platform: Windows + WSL](https://img.shields.io/badge/platform-Windows%20%2B%20WSL-0078D4?logo=linux&logoColor=white)](https://learn.microsoft.com/windows/wsl/)
+[![Release](https://img.shields.io/github/actions/workflow/status/edtroleis/vscode-wsl-distro-manager/release.yml?branch=main&label=release&logo=githubactions&logoColor=white)](https://github.com/edtroleis/vscode-wsl-distro-manager/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Keep your WSL distros healthy from the VS Code sidebar. See what each distro
