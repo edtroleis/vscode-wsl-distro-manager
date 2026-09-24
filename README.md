@@ -102,9 +102,10 @@ leading `/`.
 
 **Send Files to Distro...** copies Windows files into a folder of the distro
 (`~` by default). It runs as your user and never uses `sudo`: if the folder needs
-more permissions, it says so and changes nothing. It asks before overwriting,
-and when you send a `.tar.gz` / `.zip` it offers to extract it there, which
-restores a backup in place.
+more permissions, it says so and changes nothing. Every question is part of the
+same prompt sequence, before anything is copied: whether to overwrite or skip
+files that already exist, and, when you send a `.tar.gz` / `.zip`, whether to
+extract it there, which restores a backup in place.
 
 ### Distros managed by other tools
 

@@ -184,32 +184,56 @@ export function registerTransferCommands(register: Register, resolveDistro: Reso
 
 		const windowsPaths = await Promise.all(files.map((f) => wsl.toWindowsPath(f)));
 		const names = windowsPaths.map((p) => path.win32.basename(p));
+
+		// Every question is asked here, in the same prompt sequence, before anything is sent.
 		const clashes = await wsl.existingNames(distro.name, access.path, names);
 		let skip = new Set<string>();
 		if (clashes.length > 0) {
-			const overwrite = vscode.l10n.t('Overwrite');
-			const skipLabel = vscode.l10n.t('Skip Existing');
-			const choice = await vscode.window.showWarningMessage(
-				vscode.l10n.t('{0} already exist in {1}.', clashes.join(', '), access.path),
-				{ modal: true },
-				overwrite,
-				skipLabel,
+			const choice = await vscode.window.showQuickPick(
+				[
+					{ label: vscode.l10n.t('Overwrite them'), description: clashes.join(', '), overwrite: true },
+					{ label: vscode.l10n.t('Skip them'), description: vscode.l10n.t('Send only the new files'), overwrite: false },
+				],
+				{ title: vscode.l10n.t('{0} already exist in {1}.', clashes.join(', '), access.path) },
 			);
 			if (!choice) {
 				return;
 			}
-			if (choice === skipLabel) {
+			if (!choice.overwrite) {
 				skip = new Set(clashes);
 			}
+		}
+		const toSend = windowsPaths.filter((p) => !skip.has(path.win32.basename(p)));
+		if (toSend.length === 0) {
+			vscode.window.showInformationMessage(vscode.l10n.t('Nothing was sent: every file already existed.'));
+			return;
+		}
+
+		// Backups made by this extension can be restored in place right away.
+		const archives = toSend.map((p) => path.win32.basename(p)).filter((name) => isArchive(name));
+		let extract = false;
+		if (archives.length > 0) {
+			const choice = await vscode.window.showQuickPick(
+				[
+					{
+						label: vscode.l10n.t('Send and extract'),
+						description: vscode.l10n.t('Restores the backup in {0}; files with the same names are overwritten', access.path),
+						extract: true,
+					},
+					{ label: vscode.l10n.t('Only send'), description: archives.join(', '), extract: false },
+				],
+				{ title: vscode.l10n.t('Extract {0} after sending?', archives.join(', ')) },
+			);
+			if (!choice) {
+				return;
+			}
+			extract = choice.extract;
 		}
 
 		const sent: string[] = [];
 		await withProgress(vscode.l10n.t('Sending files to {0}...', distro.name), async () => {
-			for (const windowsPath of windowsPaths) {
+			for (const windowsPath of toSend) {
 				const name = path.win32.basename(windowsPath);
-				if (skip.has(name)) {
-					continue;
-				}
 				const source = await wsl.linuxPathInDistro(distro.name, windowsPath);
 				const result = await wsl.runAsUser(distro.name, ['cp', '--', source, `${access.path}/${name}`]);
 				if (result.code !== 0) {
@@ -217,24 +241,9 @@ export function registerTransferCommands(register: Register, resolveDistro: Reso
 				}
 				sent.push(name);
 			}
-		});
-		if (sent.length === 0) {
-			vscode.window.showInformationMessage(vscode.l10n.t('Nothing was sent: every file already existed.'));
-			return;
-		}
-
-		// A backup made by this extension can be restored in place right away.
-		const archives = sent.filter((name) => isArchive(name));
-		const extract = vscode.l10n.t('Extract Here');
-		const choice = await vscode.window.showInformationMessage(
-			vscode.l10n.t('Sent {0} to {1} in "{2}".', sent.join(', '), access.path, distro.name) +
-				(archives.length > 0 ? ' ' + vscode.l10n.t('Extract the archives there? Files with the same names are overwritten.') : ''),
-			...(archives.length > 0 ? [extract] : []),
-		);
-		if (choice !== extract) {
-			return;
-		}
-		await withProgress(vscode.l10n.t('Extracting in {0}...', access.path), async () => {
+			if (!extract) {
+				return;
+			}
 			for (const name of archives) {
 				const format = isArchive(name) as BackupFormat;
 				if (format === 'zip' && !(await wsl.hasCommand(distro.name, 'unzip'))) {
@@ -246,7 +255,11 @@ export function registerTransferCommands(register: Register, resolveDistro: Reso
 				}
 			}
 		});
-		vscode.window.showInformationMessage(vscode.l10n.t('Extracted {0} in {1}.', archives.join(', '), access.path));
+		vscode.window.showInformationMessage(
+			extract
+				? vscode.l10n.t('Sent {0} to {1} in "{2}" and extracted {3}.', sent.join(', '), access.path, distro.name, archives.join(', '))
+				: vscode.l10n.t('Sent {0} to {1} in "{2}".', sent.join(', '), access.path, distro.name),
+		);
 	});
 }
 
