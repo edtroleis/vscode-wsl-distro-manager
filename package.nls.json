@@ -34,5 +34,5 @@
   "config.backupFolder": "Windows folder offered first for *Back Up Folders*. Empty = the Windows Desktop (wherever it is redirected, e.g. OneDrive).",
   "config.backupExcludes": "Folder and file names left out of backups, at any depth. Editable each time.",
   "command.restartWsl": "Restart WSL",
-  "capabilities.untrustedWorkspaces": "WSL Distro Manager does not read or run anything from the workspace."
+  "capabilities.untrustedWorkspaces": "Distro Manager for WSL does not read or run anything from the workspace."
 }

@@ -1,6 +1,6 @@
 # Architecture
 
-How WSL Distro Manager is organized, and the WSL behaviors it works around.
+How Distro Manager for WSL is organized, and the WSL behaviors it works around.
 Most of these were found by testing against a real installation (WSL 2.7.14,
 Windows 11); each section says what goes wrong without the workaround.
 

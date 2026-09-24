@@ -41,7 +41,7 @@ Then run **Developer: Reload Window**.
 ## 3. Local VS Code window
 
 ### View and details
-- [ ] The **WSL Distro Manager** icon appears in the activity bar, and the view lists every distro.
+- [ ] The **Distro Manager for WSL** icon appears in the activity bar, and the view lists every distro.
 - [ ] Expanding a stopped distro shows its details without starting it; it stays **Stopped**.
 - [ ] Expanding a running distro shows CPU, memory, and processes, updating every 2 seconds, with the VM totals in the same rows (for example `2.8 GB · VM 5.3 GB of 24.5 GB`).
 - [ ] Collapsing it, or hiding the view, stops the updates; the rows show **paused**.

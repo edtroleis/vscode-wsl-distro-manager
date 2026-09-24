@@ -1,4 +1,4 @@
-# WSL Distro Manager
+# Distro Manager for WSL
 
 [![Release](https://img.shields.io/github/actions/workflow/status/edtroleis/vscode-wsl-distro-manager/release.yml?branch=main&label=release)](https://github.com/edtroleis/vscode-wsl-distro-manager/actions/workflows/release.yml)
 [![Marketplace](https://img.shields.io/visual-studio-marketplace/v/edtroleis.vscode-wsl-distro-manager?label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=edtroleis.vscode-wsl-distro-manager)
@@ -11,12 +11,12 @@ tools and windows that depend on them.
 
 ![Demo: expanding a running distro shows live CPU and memory and about 8.3 GB of reclaimable disk space; the context menu opens, and Back Up Folders picks a folder from the home directory and the names to leave out.](images/demo.gif)
 
-WSL Distro Manager complements Microsoft's **WSL** extension
+Distro Manager for WSL complements Microsoft's **WSL** extension
 ([`ms-vscode-remote.remote-wsl`](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-wsl)),
 which connects VS Code to a distro. This extension looks after the distros
 themselves.
 
-> WSL Distro Manager is a community project. It is not affiliated with,
+> Distro Manager for WSL is a community project. It is not affiliated with,
 > endorsed by, or supported by Microsoft. Windows, Windows Subsystem for Linux,
 > WSL, and Visual Studio Code are trademarks of Microsoft Corporation.
 
@@ -29,7 +29,7 @@ themselves.
 - Expand a distro for its OS, kernel, default user, disk usage, install
   location, and virtual disk (VHDX) size.
 
-![The WSL Distro Manager view: the WSL node with the .wslconfig summary (memory=25GB, processors=8) and the WSL and kernel versions; a running distro expanded with live CPU and memory next to the VM totals, details, and about 8.3 GB of reclaimable disk space. Podman distros are labeled.](images/overview.png)
+![The Distro Manager for WSL view: the WSL node with the .wslconfig summary (memory=25GB, processors=8) and the WSL and kernel versions; a running distro expanded with live CPU and memory next to the VM totals, details, and about 8.3 GB of reclaimable disk space. Podman distros are labeled.](images/overview.png)
 
 **Reclaim disk space**
 - See how much space a distro's virtual disk holds beyond what it uses, and
@@ -84,14 +84,14 @@ Every action is one right-click away:
 
 ## Getting started
 
-1. Install **WSL Distro Manager** from the Marketplace.
-2. Click the **WSL Distro Manager** icon in the activity bar.
+1. Install **Distro Manager for WSL** from the Marketplace.
+2. Click the **Distro Manager for WSL** icon in the activity bar.
 3. Click a distro to expand it. Right-click it for every action, or use the
    buttons on its row. The **WSL** node at the top holds what applies to all
    distros: the global `.wslconfig` and the WSL version.
 
 Every action is also in the Command Palette (`Ctrl+Shift+P`), under
-**WSL Distro Manager**.
+**Distro Manager for WSL**.
 
 ## Guides
 

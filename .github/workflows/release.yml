@@ -70,5 +70,5 @@ jobs:
             gh release upload "v$VERSION" "vscode-wsl-distro-manager-$VERSION.vsix" --clobber
           else
             gh release create "v$VERSION" "vscode-wsl-distro-manager-$VERSION.vsix" \
-              --target "$GITHUB_SHA" --title "WSL Distro Manager $VERSION" --notes-file notes.md
+              --target "$GITHUB_SHA" --title "Distro Manager for WSL $VERSION" --notes-file notes.md
           fi

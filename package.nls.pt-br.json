@@ -34,5 +34,5 @@
   "config.backupFolder": "Pasta do Windows oferecida primeiro em *Fazer Backup de Pastas*. Vazio = a Área de Trabalho do Windows (onde quer que esteja redirecionada, como no OneDrive).",
   "config.backupExcludes": "Nomes de pastas e arquivos deixados fora dos backups, em qualquer nível. Editável a cada backup.",
   "command.restartWsl": "Reiniciar o WSL",
-  "capabilities.untrustedWorkspaces": "O WSL Distro Manager não lê nem executa nada do workspace."
+  "capabilities.untrustedWorkspaces": "O Distro Manager for WSL não lê nem executa nada do workspace."
 }

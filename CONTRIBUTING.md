@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping improve WSL Distro Manager. This guide covers the
+Thanks for helping improve Distro Manager for WSL. This guide covers the
 development setup, tests, localization, and releases. For how the extension
 works, read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) first.
 
