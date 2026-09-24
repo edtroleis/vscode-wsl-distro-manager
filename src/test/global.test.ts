@@ -61,15 +61,17 @@ describe('WSL node', () => {
 		assert.equal(new GlobalItem(true).id, 'global');
 	});
 
-	it('shows the .wslconfig summary and opens the file on click', () => {
+	it('is named after the file, keeps the values in the tooltip, and opens the file on click', () => {
 		const item = wslConfigItem('memory=25GB · processors=8', true, 'C:\\Users\\u\\.wslconfig');
-		assert.equal(item.description, 'memory=25GB · processors=8');
+		assert.equal(item.label, '.wslconfig');
+		assert.equal(item.description, undefined);
+		assert.match(String(item.tooltip), /memory=25GB · processors=8/);
 		assert.equal(item.command?.command, 'wslManager.editWslConfig');
 	});
 
 	it('says when .wslconfig does not exist or sets nothing', () => {
-		assert.equal(wslConfigItem(undefined, false, 'x').description, 'not created; WSL defaults');
-		assert.equal(wslConfigItem(undefined, true, 'x').description, 'WSL defaults');
+		assert.equal(wslConfigItem(undefined, false, 'x').description, 'not created');
+		assert.match(String(wslConfigItem(undefined, true, 'x').tooltip), /WSL defaults/);
 	});
 
 	it('shows the WSL and kernel versions, or how to get them', () => {
@@ -81,7 +83,7 @@ describe('WSL node', () => {
 describe('pending .wslconfig changes', () => {
 	it('flags the row, says WSL (not Windows) must restart, and offers the restart inline', () => {
 		const item = wslConfigItem('memory=25GB', true, 'C:\\Users\\u\\.wslconfig', true);
-		assert.equal(item.description, 'restart WSL to apply · memory=25GB');
+		assert.equal(item.description, 'restart WSL to apply');
 		assert.equal(item.contextValue, 'wslGlobalConfig.pending');
 		assert.match(String(item.tooltip), /restart WSL \(not Windows\)/);
 	});

@@ -38,7 +38,7 @@ themselves.
 - Expand a distro for its OS, kernel, default user, disk usage, install
   location, and virtual disk (VHDX) size.
 
-![The Distro Manager for WSL view: the WSL node with the .wslconfig summary (memory=25GB, processors=8) and the WSL and kernel versions; a running distro expanded with live CPU and memory next to the VM totals, details, and about 8.3 GB of reclaimable disk space. Podman distros are labeled.](images/overview.png)
+![The Distro Manager for WSL view: the WSL node with the .wslconfig row and the WSL and kernel versions; a running distro expanded with live CPU and memory next to the VM totals, details, and about 8.3 GB of reclaimable disk space. Podman distros are labeled.](images/overview.png)
 
 **Reclaim disk space**
 - See how much space a distro's virtual disk holds beyond what it uses, and
@@ -74,9 +74,9 @@ themselves.
   you choose, and move a distro's disk to another folder or drive.
 - Set the default distro, restart WSL, or shut it down. *Restart WSL* starts
   again only the distros that were running.
-- Edit the global `.wslconfig` from the **WSL** node at the top of the view,
-  which also summarizes its main settings and shows the WSL and kernel
-  versions. See [Configure WSL](#configure-wsl-wslconfig).
+- Edit the global `.wslconfig` from its row under the **WSL** node, at the top
+  of the view; hover it to see the main settings. The node also shows the WSL
+  and kernel versions. See [Configure WSL](#configure-wsl-wslconfig).
 
 Every action is one right-click away:
 
@@ -189,7 +189,7 @@ extract `.tar.gz` or `.zip` archives. Extract only archives you trust.
 ### Configure WSL (.wslconfig)
 
 `%USERPROFILE%\.wslconfig` holds the settings of the WSL VM that every distro
-shares, such as `memory` and `processors`. Click *Settings (.wslconfig)* under
+shares, such as `memory` and `processors`. Click the *.wslconfig* row under
 the **WSL** node to edit it; when the file does not exist yet, it opens with a
 commented template.
 
@@ -276,7 +276,7 @@ sudo sh -c "echo :WSLInterop:M::MZ::/init:P > /proc/sys/fs/binfmt_misc/register"
 
 **A `.wslconfig` change has no effect.** It applies only when the WSL VM
 restarts, not Windows. Run **Restart WSL** from the **WSL** node; the
-*Settings (.wslconfig)* row shows *restart WSL to apply* until the change is in
+*.wslconfig* row shows *restart WSL to apply* until the change is in
 effect.
 
 **A VS Code window connected to WSL shows "Failed to connect to the remote

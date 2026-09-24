@@ -189,12 +189,18 @@ export function wslConfigItem(
 	file: string,
 	pending = false,
 ): vscode.TreeItem {
-	const item = new vscode.TreeItem(vscode.l10n.t('Settings (.wslconfig)'), vscode.TreeItemCollapsibleState.None);
+	// The file name says what it is; the row stays short, with the values in
+	// the tooltip and only a state that needs attention in the description.
+	const item = new vscode.TreeItem('.wslconfig', vscode.TreeItemCollapsibleState.None);
 	item.id = 'global/wslconfig';
-	const values = summary ?? (exists ? vscode.l10n.t('WSL defaults') : vscode.l10n.t('not created; WSL defaults'));
-	item.description = pending ? vscode.l10n.t('restart WSL to apply · {0}', values) : values;
+	item.description = pending
+		? vscode.l10n.t('restart WSL to apply')
+		: exists
+			? undefined
+			: vscode.l10n.t('not created');
 	item.tooltip = [
 		file,
+		summary ?? (exists ? vscode.l10n.t('WSL defaults') : vscode.l10n.t('not created; WSL defaults')),
 		'',
 		pending
 			? vscode.l10n.t('Saved changes are not applied yet: restart WSL (not Windows) to apply them.')

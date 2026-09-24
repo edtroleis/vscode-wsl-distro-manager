@@ -61,8 +61,8 @@ Then run **Developer: Reload Window**.
 - [ ] `wslManager.showManagedDistros: false` hides them; `true` shows them again. With only managed distros installed and the setting off, the view says they are hidden.
 
 ### Configuration files
-- [ ] The **WSL** node is first in the view and expanded; it shows *Settings (.wslconfig)* with a summary of the file (or *WSL defaults*) and *Version* with the WSL and kernel versions. Distros list no configuration files, and no menu offers to edit `/etc/wsl.conf`.
-- [ ] Clicking *Settings (.wslconfig)* opens `%USERPROFILE%\.wslconfig`; saving updates the summary and says the change applies after WSL (not Windows) restarts, with **Restart WSL Now**.
+- [ ] The **WSL** node is first in the view and expanded; it shows *.wslconfig*, with the file's values (or *WSL defaults*) in its tooltip and nothing after the name, and *Version* with the WSL and kernel versions. Distros list no configuration files, and no menu offers to edit `/etc/wsl.conf`.
+- [ ] Clicking *.wslconfig* opens `%USERPROFILE%\.wslconfig`; saving updates the tooltip and says the change applies after WSL (not Windows) restarts, with **Restart WSL Now**.
 - [ ] After saving without restarting, the row shows *restart WSL to apply* with a warning icon and an inline restart button, also after reloading the window.
 - [ ] **Restart WSL** from a window connected to WSL (with the extension running there) refuses and explains why.
 - [ ] **Restart WSL** lists the running distros, stops WSL, and starts again only those that were running (not Podman/Docker ones); stopped distros stay stopped, and the pending mark disappears.
@@ -118,7 +118,7 @@ publishing.
 | File | Shows |
 |---|---|
 | `demo.gif` *(retake: shows .wslconfig under the distro and Edit /etc/wsl.conf)* | The top of the README: expanding a running distro (live metrics, reclaimable space), the context menu, and a backup. Under 5 MB, recorded with ScreenToGif at 12 fps. |
-| `overview.png` | The WSL node and several distros, one expanded and running: live metrics with VM totals, details, reclaimable VHDX space, Podman labels. |
+| `overview.png` *(retake: the row now reads `.wslconfig`, without values)* | The WSL node and several distros, one expanded and running: live metrics with VM totals, details, reclaimable VHDX space, Podman labels. |
 | `compact.png` *(retake: shows `.wslconfig` under the distro)* | The VHDX row with reclaimable space and the *Compact Disk* confirmation. |
 | `compact-shutdown.png` | The confirmation to shut WSL down for a compaction. |
 | `compact-progress.png` | The compaction progress with the elapsed time. |

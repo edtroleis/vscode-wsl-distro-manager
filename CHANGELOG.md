@@ -31,8 +31,11 @@ project follows [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - The gear in the view's title bar opens the extension's settings. The global
-  `.wslconfig` opens from *Settings (.wslconfig)* under the **WSL** node, or
-  with *Edit .wslconfig (Global)* in the Command Palette.
+  `.wslconfig` opens from its row under the **WSL** node, or with
+  *Edit .wslconfig (Global)* in the Command Palette.
+- The *Settings (.wslconfig)* row is now *.wslconfig*, and its values (such as
+  `memory` and `processors`) moved to its tooltip. The row shows only
+  *restart WSL to apply* or *not created* when that applies.
 
 ## [0.0.2] - 2026-09-24
 
