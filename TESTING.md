@@ -50,7 +50,9 @@ Windows host.
 - [ ] `wslManager.showManagedDistros: false` hides them; `true` brings them back.
 - [ ] *Edit /etc/wsl.conf* opens the file; saving offers to restart the distro.
 - [ ] *Edit .wslconfig* opens `%USERPROFILE%\.wslconfig`; saving offers `wsl --shutdown`.
-- [ ] *Export* suggests `C:\Users\<you>\<distro>.tar` and produces the file.
+- [ ] *Export* suggests `C:\Users\<you>\<distro>.tar`, shows progress, and produces the file; cancelling it removes the partial file.
+- [ ] *Install Distro...* lists the online catalog; installing one with a custom name works, and *Open Terminal* finishes its setup (default user). Cancelling leaves nothing registered.
+- [ ] *Move to Another Folder...* on a spare distro moves its VHDX (check *Location*) and it still starts; with a window connected to WSL it refuses without changes.
 - [ ] *Import* of that file under a new name creates a working distro; *Unregister* removes it.
 - [ ] *Compact Disk* on a distro you can spare:
   - [ ] Declining the UAC prompt shows an error and leaves the distro as it was.

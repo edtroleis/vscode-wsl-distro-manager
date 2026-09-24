@@ -45,6 +45,20 @@ export interface RunOptions {
 	stdin?: Buffer;
 	/** Do not reject the promise when the process exits with a non-zero code. */
 	tolerateFailure?: boolean;
+	/** Kills the process when aborted; the promise then rejects with CancelledError. */
+	signal?: AbortSignal;
+}
+
+/**
+ * Thrown when a run is aborted. Killing the wsl.exe client really cancels the
+ * operation in the WSL service: an export stops writing, and an import removes
+ * its install folder and registers nothing (verified on WSL 2.7).
+ */
+export class CancelledError extends Error {
+	constructor() {
+		super('Cancelled');
+		this.name = 'CancelledError';
+	}
 }
 
 export interface RunResult {
@@ -77,6 +91,22 @@ export function interopBroken(binfmtDir = '/proc/sys/fs/binfmt_misc'): boolean {
 	}
 }
 
+/**
+ * On Windows, wsl.exe hands the work to a child wsl.exe; killing only the
+ * parent left an export writing and an import running. Kill the whole tree.
+ * From the Linux side, killing the interop process already ends the tree.
+ */
+function killTree(child: ChildProcess): void {
+	if (process.platform === 'win32' && child.pid !== undefined) {
+		spawn('taskkill.exe', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }).on(
+			'error',
+			() => child.kill(),
+		);
+	} else {
+		child.kill();
+	}
+}
+
 function spawnCapture(
 	command: string,
 	args: string[],
@@ -93,7 +123,17 @@ function spawnCapture(
 		child.stdout.on('data', (c: Buffer) => out.push(c));
 		child.stderr.on('data', (c: Buffer) => err.push(c));
 		child.on('error', reject);
+		const onAbort = () => killTree(child);
+		opts.signal?.addEventListener('abort', onAbort);
+		if (opts.signal?.aborted) {
+			killTree(child);
+		}
 		child.on('close', (code) => {
+			opts.signal?.removeEventListener('abort', onAbort);
+			if (opts.signal?.aborted) {
+				reject(new CancelledError());
+				return;
+			}
 			const result: RunResult = {
 				stdout: decode(Buffer.concat(out)),
 				stderr: decode(Buffer.concat(err)),
@@ -252,12 +292,59 @@ export async function start(name: string): Promise<void> {
 	);
 }
 
-export function exportDistro(name: string, target: string, vhd: boolean) {
-	return run(['--export', name, target, ...(vhd ? ['--vhd'] : [])]);
+export function exportDistro(name: string, target: string, vhd: boolean, signal?: AbortSignal) {
+	return run(['--export', name, target, ...(vhd ? ['--vhd'] : [])], { signal });
 }
 
-export function importDistro(name: string, installDir: string, source: string, vhd: boolean) {
-	return run(['--import', name, installDir, source, ...(vhd ? ['--vhd'] : [])]);
+export function importDistro(name: string, installDir: string, source: string, vhd: boolean, signal?: AbortSignal) {
+	return run(['--import', name, installDir, source, ...(vhd ? ['--vhd'] : [])], { signal });
+}
+
+/** Moves the distro's VHDX to another folder; the distro must be stopped. */
+export function moveDistro(name: string, location: string, signal?: AbortSignal) {
+	return run(['--manage', name, '--move', location], { signal });
+}
+
+/**
+ * Installs a distro from the online catalog without launching it, so no
+ * interactive first-run setup blocks us; that setup (creating the default
+ * user) happens the first time a terminal is opened in it.
+ */
+export function installDistro(distro: string, name: string, location: string | undefined, signal?: AbortSignal) {
+	return run(
+		['--install', distro, '--name', name, ...(location ? ['--location', location] : []), '--no-launch'],
+		{ signal },
+	);
+}
+
+export interface OnlineDistro {
+	name: string;
+	friendlyName: string;
+}
+
+export async function listOnline(): Promise<OnlineDistro[]> {
+	return parseOnlineList((await run(['--list', '--online'])).stdout);
+}
+
+/**
+ * The intro lines of `--list --online` are localized, but the table header
+ * stays "NAME  FRIENDLY NAME". Rows follow it: a name, two or more spaces, and
+ * the friendly name.
+ */
+export function parseOnlineList(stdout: string): OnlineDistro[] {
+	const rows = stdout.split(/\r?\n/).map((l) => l.replace(/\0/g, '').trimEnd());
+	const header = rows.findIndex((l) => /^NAME\s{2,}FRIENDLY NAME$/.test(l.trim()));
+	if (header < 0) {
+		return [];
+	}
+	const distros: OnlineDistro[] = [];
+	for (const row of rows.slice(header + 1)) {
+		const match = /^(\S+)\s{2,}(\S.*)$/.exec(row.trim());
+		if (match) {
+			distros.push({ name: match[1], friendlyName: match[2] });
+		}
+	}
+	return distros;
 }
 
 /**

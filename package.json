@@ -57,7 +57,7 @@
     "viewsWelcome": [
       {
         "view": "wslManager.distros",
-        "contents": "No WSL distros found.\n[Refresh](command:wslManager.refresh)\n[Import Distro](command:wslManager.import)"
+        "contents": "No WSL distros found.\n[Install Distro](command:wslManager.install)\n[Import Distro](command:wslManager.import)\n[Refresh](command:wslManager.refresh)"
       }
     ],
     "languages": [
@@ -92,6 +92,12 @@
         "title": "Edit .wslconfig (Global)",
         "category": "WSL Distro Manager",
         "icon": "$(settings-gear)"
+      },
+      {
+        "command": "wslManager.install",
+        "title": "Install Distro...",
+        "category": "WSL Distro Manager",
+        "icon": "$(add)"
       },
       {
         "command": "wslManager.import",
@@ -154,6 +160,12 @@
         "icon": "$(fold)"
       },
       {
+        "command": "wslManager.move",
+        "title": "Move to Another Folder...",
+        "category": "WSL Distro Manager",
+        "icon": "$(folder-opened)"
+      },
+      {
         "command": "wslManager.setVersion",
         "title": "Convert to WSL 1 / WSL 2...",
         "category": "WSL Distro Manager"
@@ -172,6 +184,11 @@
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "wslManager.install",
+          "when": "view == wslManager.distros",
+          "group": "1_manage@0"
+        },
         {
           "command": "wslManager.refresh",
           "when": "view == wslManager.distros",
@@ -268,6 +285,11 @@
           "command": "wslManager.compact",
           "when": "view == wslManager.distros && viewItem =~ /^wslDistro\\.(running|stopped)$/",
           "group": "4_backup@2"
+        },
+        {
+          "command": "wslManager.move",
+          "when": "view == wslManager.distros && viewItem =~ /^wslDistro\\.(running|stopped)$/",
+          "group": "4_backup@3"
         },
         {
           "command": "wslManager.copyName",

@@ -11,6 +11,8 @@ Initial release.
 - The reclaimable-space estimate only appears when a compaction is worth it (gap of at least 2 GB and 10% of the used space); the confirmation states the expected gain.
 - Compaction never shuts WSL down while a VS Code window is connected to it: it stops, changes nothing, and names the windows to close.
 - Start, stop, restart, set default, convert WSL 1/2, export, import, unregister, shut down WSL.
+- Install distros from the online catalog (name and location of your choice) and move a distro's disk to another folder or drive.
+- Export, import, move, and install show progress and can be cancelled; a cancelled export deletes its partial file and a cancelled import leaves nothing registered.
 - Open a terminal or a new VS Code window connected to a distro.
 - Edit `/etc/wsl.conf` (as root) and the global `.wslconfig`, with a prompt to apply changes on save.
 - Distros created by Docker Desktop, Podman, and Rancher Desktop are labeled, hidden from configuration actions, and protected by warnings; they can also be hidden from the list.

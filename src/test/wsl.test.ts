@@ -10,14 +10,17 @@ import {
 	managedBy,
 	parseDistroList,
 	parseRegistry,
+	parseOnlineList,
 	parseRuntimeInfo,
+	run,
+	CancelledError,
 	parseVscodeConnectedDistros,
 	toWindowsPath,
 } from '../wsl';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { Uri, env, workspace } from './vscode.mock';
+import { Uri, env, settings, workspace } from './vscode.mock';
 
 /** wsl.exe output as it arrives on stdout: UTF-16LE, CRLF, no BOM. */
 function utf16(text: string): Buffer {
@@ -372,5 +375,59 @@ describe('parseVscodeConnectedDistros', () => {
 			parseVscodeConnectedDistros('wsl.exe --distribution "My Distro" -e /home/u/.vscode-server/bin/x/node'),
 			['My Distro'],
 		);
+	});
+});
+
+describe('parseOnlineList', () => {
+	// Real `wsl --list --online` output on a Portuguese Windows: the intro is localized, the table is not.
+	const output = [
+		'A seguir está uma lista de distribuições válidas que podem ser instaladas.',
+		"Instale usando 'wsl.exe --install <Distro>'.",
+		'',
+		'NAME                            FRIENDLY NAME',
+		'Ubuntu                          Ubuntu',
+		'Ubuntu-24.04                    Ubuntu 24.04 LTS',
+		'SUSE-Linux-Enterprise-15-SP7    SUSE Linux Enterprise 15 SP7',
+		'Debian                          Debian GNU/Linux',
+		'',
+	].join('\r\n');
+
+	it('reads name and friendly name from each row', () => {
+		assert.deepEqual(parseOnlineList(output), [
+			{ name: 'Ubuntu', friendlyName: 'Ubuntu' },
+			{ name: 'Ubuntu-24.04', friendlyName: 'Ubuntu 24.04 LTS' },
+			{ name: 'SUSE-Linux-Enterprise-15-SP7', friendlyName: 'SUSE Linux Enterprise 15 SP7' },
+			{ name: 'Debian', friendlyName: 'Debian GNU/Linux' },
+		]);
+	});
+
+	it('ignores the localized intro, whatever language it is in', () => {
+		assert.equal(parseOnlineList(output.replace('A seguir está', 'The following is')).length, 4);
+	});
+
+	it('returns nothing when there is no table (offline, error)', () => {
+		assert.deepEqual(parseOnlineList('Failed to fetch the list of distributions.\r\n'), []);
+	});
+});
+
+describe('run cancellation', { skip: process.platform === 'win32' }, () => {
+	afterEach(() => {
+		delete settings['wslExePath'];
+	});
+
+	it('kills the process and rejects with CancelledError when aborted', async () => {
+		settings['wslExePath'] = '/bin/sleep';
+		const controller = new AbortController();
+		const started = Date.now();
+		setTimeout(() => controller.abort(), 100);
+		await assert.rejects(run(['10'], { signal: controller.signal }), CancelledError);
+		assert.ok(Date.now() - started < 3000);
+	});
+
+	it('does not start work that was already cancelled', async () => {
+		settings['wslExePath'] = '/bin/sleep';
+		const controller = new AbortController();
+		controller.abort();
+		await assert.rejects(run(['10'], { signal: controller.signal }), CancelledError);
 	});
 });

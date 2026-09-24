@@ -21,7 +21,9 @@ official extension does not: start/stop, `--set-default`, export/import,
 | Start / Stop / Restart | `wsl -d <d> -e /bin/true` + a hidden idle session, `wsl --terminate <d>` |
 | Set default distro | `wsl --set-default <d>` |
 | Convert WSL 1 ⇄ WSL 2 | `wsl --set-version <d> <n>` |
-| Export / Import (`.tar` or `.vhdx`) | `wsl --export` / `wsl --import` |
+| Install a distro from the online catalog | `wsl --list --online`, `wsl --install <d> --name <n> [--location <dir>] --no-launch` |
+| Export / Import (`.tar` or `.vhdx`), with progress and cancel | `wsl --export` / `wsl --import` |
+| Move a distro's disk to another folder or drive | `wsl --manage <d> --move <dir>` |
 | Unregister a distro | `wsl --unregister <d>` |
 | Shut down WSL | `wsl --shutdown` |
 | Open a terminal | `wsl -d <d> [-u <user>]` |
@@ -32,6 +34,13 @@ official extension does not: start/stop, `--set-default`, export/import,
 Every action is also in the distro's context menu:
 
 ![Context menu of a distro: open window or terminal, stop, restart, set default, edit wsl.conf, convert, export, compact disk, copy name, unregister](images/context-menu.png)
+
+Long operations (export, import, move, install) show progress and can be
+cancelled. Cancelling ends the whole `wsl.exe` process tree, which really stops
+the work in the WSL service: an export stops writing and its partial file is
+deleted, and a cancelled import leaves nothing registered. Moving a distro, like
+compacting it, needs its disk released, which current WSL only does when the
+whole VM shuts down; the same rules apply (see below).
 
 Destructive actions (stop, shut down, convert) ask for confirmation;
 `unregister` requires typing the distro name. Actions that would disconnect the
