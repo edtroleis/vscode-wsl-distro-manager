@@ -58,6 +58,8 @@ async function onConfigSaved(document: vscode.TextDocument): Promise<void> {
 		return;
 	}
 
+	// The WSL node summarizes .wslconfig: show the new values right away.
+	void vscode.commands.executeCommand('wslManager.refresh');
 	const choice = await vscode.window.showInformationMessage(
 		vscode.l10n.t('.wslconfig saved. Run "wsl --shutdown" to apply it?'),
 		vscode.l10n.t('Shut Down WSL'),

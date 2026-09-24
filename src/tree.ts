@@ -2,7 +2,19 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { DistroMonitor, formatBytes } from './monitor';
-import { Distro, isCurrentWindowDistro, list, managedBy, registryInfo, restoreInterop, runtimeInfo, toHostPath } from './wsl';
+import {
+	Distro,
+	isCurrentWindowDistro,
+	list,
+	managedBy,
+	readWslConfig,
+	registryInfo,
+	restoreInterop,
+	runtimeInfo,
+	summarizeWslConfig,
+	toHostPath,
+	wslVersion,
+} from './wsl';
 
 /**
  * How much a compaction would likely give back, or undefined when it is not
@@ -135,6 +147,47 @@ export function vhdxItem(parent: DistroItem, vhdWindows: string, size: number, u
 	return item;
 }
 
+/**
+ * The first node of the view: what applies to WSL as a whole, not to one
+ * distro. The global .wslconfig lives here instead of being repeated under
+ * every distro, next to the WSL and kernel versions.
+ */
+export class GlobalItem extends vscode.TreeItem {
+	constructor(expanded: boolean) {
+		super('WSL', expanded ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed);
+		this.id = 'global';
+		this.description = vscode.l10n.t('all distros');
+		this.tooltip = vscode.l10n.t('Settings and versions that apply to WSL as a whole');
+		this.iconPath = new vscode.ThemeIcon('server-environment');
+		this.contextValue = 'wslGlobal';
+	}
+}
+
+/** The .wslconfig row: what is set, at a glance; a click opens the file. */
+export function wslConfigItem(summary: string | undefined, exists: boolean, file: string): vscode.TreeItem {
+	const item = new vscode.TreeItem(vscode.l10n.t('Settings (.wslconfig)'), vscode.TreeItemCollapsibleState.None);
+	item.id = 'global/wslconfig';
+	item.description = summary ?? (exists ? vscode.l10n.t('WSL defaults') : vscode.l10n.t('not created; WSL defaults'));
+	item.tooltip = `${file}\n\n${vscode.l10n.t('Applies to every distro after "wsl --shutdown".')}`;
+	item.iconPath = new vscode.ThemeIcon('gear');
+	item.contextValue = 'wslGlobalConfig';
+	item.command = { command: 'wslManager.editWslConfig', title: vscode.l10n.t('Edit {0}', '.wslconfig') };
+	return item;
+}
+
+export function wslVersionItem(version: { wsl: string; kernel?: string } | undefined): vscode.TreeItem {
+	const item = new vscode.TreeItem(vscode.l10n.t('Version'), vscode.TreeItemCollapsibleState.None);
+	item.id = 'global/version';
+	item.description = version
+		? version.kernel
+			? vscode.l10n.t('WSL {0} · kernel {1}', version.wsl, version.kernel)
+			: `WSL ${version.wsl}`
+		: vscode.l10n.t('unknown (run "wsl --update")');
+	item.iconPath = new vscode.ThemeIcon('info');
+	item.contextValue = 'wslInfo';
+	return item;
+}
+
 class MessageItem extends vscode.TreeItem {
 	constructor(message: string, icon: string) {
 		super(message, vscode.TreeItemCollapsibleState.None);
@@ -170,6 +223,9 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 	/** Expanded distros by name, since a state change gives the item a new id. */
 	private readonly expanded = new Set<string>();
 
+	/** The WSL node starts expanded; remember when the user collapses it. */
+	private collapsedGlobal = false;
+
 	/** Running distros at the last refresh, to notice distros that stopped. */
 	private lastRunning: Set<string> | undefined;
 	private restoringInterop = false;
@@ -186,6 +242,16 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 		if (element instanceof DistroItem) {
 			return this.distroChildren(element);
 		}
+		if (element instanceof GlobalItem) {
+			const [config, version] = await Promise.all([
+				readWslConfig().catch(() => undefined),
+				wslVersion(),
+			]);
+			return [
+				wslConfigItem(config && summarizeWslConfig(config.config), config?.exists ?? false, config?.path ?? '.wslconfig'),
+				wslVersionItem(version),
+			];
+		}
 		if (element) {
 			return [];
 		}
@@ -198,9 +264,11 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 			const showManaged = vscode.workspace
 				.getConfiguration('wslManager')
 				.get<boolean>('showManagedDistros', true);
-			return distros
+			const items = distros
 				.filter((d) => showManaged || !managedBy(d.name))
 				.map((d) => new DistroItem(d, this.expanded.has(d.name)));
+			// With no distros, show nothing so the welcome view (Install / Import) appears.
+			return items.length > 0 ? [new GlobalItem(!this.collapsedGlobal), ...items] : [];
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			return [new MessageItem(vscode.l10n.t('Failed to query wsl.exe: {0}', message), 'error')];
@@ -233,6 +301,7 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 	/** Drops the details cache; used by the manual refresh. */
 	invalidateDetails(): void {
 		this.details.clear();
+		void wslVersion(true);
 	}
 
 	private monitorFor(name: string): DistroMonitor {
@@ -337,7 +406,6 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 
 		children.push(
 			new ConfigFileItem(item, '/etc/wsl.conf', vscode.l10n.t('this distro'), 'wslManager.editWslConf'),
-			new ConfigFileItem(item, '.wslconfig', vscode.l10n.t('global (all distros)'), 'wslManager.editWslConfig'),
 		);
 		return children;
 	}
@@ -360,12 +428,18 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 			}),
 			// Re-expanding an already loaded node does not call getChildren again.
 			view.onDidExpandElement((e) => {
+				if (e.element instanceof GlobalItem) {
+					this.collapsedGlobal = false;
+				}
 				if (e.element instanceof DistroItem) {
 					this.expanded.add(e.element.distro.name);
 					this.startMonitor(e.element.distro);
 				}
 			}),
 			view.onDidCollapseElement((e) => {
+				if (e.element instanceof GlobalItem) {
+					this.collapsedGlobal = true;
+				}
 				if (e.element instanceof DistroItem) {
 					this.expanded.delete(e.element.distro.name);
 					this.monitors.get(e.element.distro.name)?.stop();

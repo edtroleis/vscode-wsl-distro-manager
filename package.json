@@ -2,7 +2,7 @@
   "name": "wsl-distro-manager",
   "displayName": "WSL Distro Manager",
   "description": "%description%",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "publisher": "edtroleis",
   "license": "MIT",
   "icon": "resources/icon.png",

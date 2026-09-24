@@ -800,3 +800,88 @@ export async function existingNames(distro: string, folder: string, names: strin
 	const result = await runAsUser(distro, ['sh', '-c', script, 'sh', folder, ...names]);
 	return result.stdout.split(/\r?\n/).filter(Boolean);
 }
+
+export interface WslVersion {
+	wsl: string;
+	kernel?: string;
+}
+
+/**
+ * `wsl --version` labels are localized ("Versão do WSL: 2.7.14.0"), but the
+ * order is fixed: WSL first, kernel second. Read values by position. Old inbox
+ * WSL has no --version and prints usage instead: no ": <digit>" lines.
+ */
+export function parseWslVersion(stdout: string): WslVersion | undefined {
+	const values = stdout
+		.split(/\r?\n/)
+		.map((line) => /:\s*(\d[\w.+-]*)\s*$/.exec(line.replace(/\0/g, ''))?.[1])
+		.filter((v): v is string => v !== undefined);
+	return values.length > 0 ? { wsl: values[0], kernel: values[1] } : undefined;
+}
+
+let cachedWslVersion: Promise<WslVersion | undefined> | undefined;
+
+/** Cached for the session: it only changes with `wsl --update`. */
+export function wslVersion(refresh = false): Promise<WslVersion | undefined> {
+	if (refresh || !cachedWslVersion) {
+		cachedWslVersion = run(['--version'], { tolerateFailure: true }).then(
+			(r) => (r.code === 0 ? parseWslVersion(r.stdout) : undefined),
+			() => undefined,
+		);
+	}
+	return cachedWslVersion;
+}
+
+export type WslConfig = Record<string, Record<string, string>>;
+
+/**
+ * Minimal INI reader for .wslconfig: [sections], key=value, and comments
+ * starting with # or ; (whole-line or after a value, which people do write:
+ * "memory=8GB  # limit"). Section and key names are lowercased.
+ */
+export function parseWslConfig(text: string): WslConfig {
+	const config: WslConfig = {};
+	let section = '';
+	for (const raw of text.split(/\r?\n/)) {
+		const line = raw.replace(/\s[#;].*$/, '').replace(/^\s*[#;].*$/, '').trim();
+		if (!line) {
+			continue;
+		}
+		const header = /^\[([^\]]+)\]$/.exec(line);
+		if (header) {
+			section = header[1].trim().toLowerCase();
+			continue;
+		}
+		const pair = /^([^=]+)=(.*)$/.exec(line);
+		if (pair) {
+			(config[section] ??= {})[pair[1].trim().toLowerCase()] = pair[2].trim().replace(/^"(.*)"$/, '$1');
+		}
+	}
+	return config;
+}
+
+/** The .wslconfig keys worth showing at a glance, in this order. */
+const WSLCONFIG_SUMMARY_KEYS: [section: string, key: string, label: string][] = [
+	['wsl2', 'memory', 'memory'],
+	['wsl2', 'processors', 'processors'],
+	['wsl2', 'swap', 'swap'],
+	['wsl2', 'networkingmode', 'networkingMode'],
+	['wsl2', 'vmidletimeout', 'vmIdleTimeout'],
+	['experimental', 'automemoryreclaim', 'autoMemoryReclaim'],
+	['experimental', 'sparsevhd', 'sparseVhd'],
+];
+
+/** "memory=25GB · processors=8", or undefined when nothing notable is set. */
+export function summarizeWslConfig(config: WslConfig): string | undefined {
+	const parts = WSLCONFIG_SUMMARY_KEYS.filter(([section, key]) => config[section]?.[key] !== undefined).map(
+		([section, key, label]) => `${label}=${config[section][key]}`,
+	);
+	return parts.length > 0 ? parts.join(' · ') : undefined;
+}
+
+/** The global .wslconfig, parsed; an empty config when the file does not exist. */
+export async function readWslConfig(): Promise<{ path: string; config: WslConfig; exists: boolean }> {
+	const file = path.join(await windowsHomeDir(), '.wslconfig');
+	const text = await fs.readFile(file, 'utf8').catch(() => undefined);
+	return { path: file, config: text === undefined ? {} : parseWslConfig(text), exists: text !== undefined };
+}

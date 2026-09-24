@@ -60,8 +60,10 @@ Then run **Developer: Reload Window**.
 - [ ] `wslManager.showManagedDistros: false` hides them; `true` shows them again.
 
 ### Configuration files
+- [ ] The **WSL** node is first in the view and expanded; it shows *Settings (.wslconfig)* with a summary of the file (or *WSL defaults*) and *Version* with the WSL and kernel versions. Distros no longer list `.wslconfig`.
 - [ ] *Edit /etc/wsl.conf* opens the file; saving offers to restart the distro.
-- [ ] *Edit .wslconfig* opens `%USERPROFILE%\.wslconfig`; saving offers to run `wsl --shutdown`.
+- [ ] Clicking *Settings (.wslconfig)* opens `%USERPROFILE%\.wslconfig`; saving updates the summary and offers to run `wsl --shutdown`.
+- [ ] Collapsing the **WSL** node keeps it collapsed across refreshes.
 
 ### Install, export, import, move
 - [ ] *Install Distro...* lists the online catalog. Installing one under a custom name works, and *Open Terminal* finishes its setup. Cancelling leaves nothing registered.
@@ -105,8 +107,8 @@ publishing.
 | File | Shows |
 |---|---|
 | `demo.gif` | The top of the README: expanding a running distro (live metrics, reclaimable space), the context menu, and a backup. Under 5 MB, recorded with ScreenToGif at 12 fps. |
-| `overview.png` | Several distros, one expanded and running: live metrics, details, reclaimable VHDX space, Podman labels. |
-| `compact.png` | The VHDX row with reclaimable space and the *Compact Disk* confirmation. |
+| `overview.png` *(retake: shows `.wslconfig` under the distro)* | Several distros, one expanded and running: live metrics, details, reclaimable VHDX space, Podman labels. |
+| `compact.png` *(retake: shows `.wslconfig` under the distro)* | The VHDX row with reclaimable space and the *Compact Disk* confirmation. |
 | `compact-shutdown.png` | The confirmation to shut WSL down for a compaction. |
 | `compact-progress.png` | The compaction progress with the elapsed time. |
 | `context-menu.png` | The context menu of a running distro. |

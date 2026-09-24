@@ -59,8 +59,10 @@ themselves.
 - Install distros from the official online catalog, with the name and location
   you choose, and move a distro's disk to another folder or drive.
 - Set the default distro, convert between WSL 1 and WSL 2, or shut down WSL.
-- Edit a distro's `/etc/wsl.conf` (saved as root) and the global `.wslconfig`;
-  on save, the extension offers the step that applies the change.
+- Edit a distro's `/etc/wsl.conf` (saved as root) from the distro, and the
+  global `.wslconfig` from the **WSL** node at the top of the view, which also
+  summarizes its main settings and shows the WSL and kernel versions. On save,
+  the extension offers the step that applies the change.
 
 Every action is one right-click away:
 
@@ -79,7 +81,8 @@ Every action is one right-click away:
 1. Install **WSL Distro Manager** from the Marketplace.
 2. Click the **WSL Distro Manager** icon in the activity bar.
 3. Click a distro to expand it. Right-click it for every action, or use the
-   buttons on its row.
+   buttons on its row. The **WSL** node at the top holds what applies to all
+   distros: the global `.wslconfig` and the WSL version.
 
 Every action is also in the Command Palette (`Ctrl+Shift+P`), under
 **WSL Distro Manager**.

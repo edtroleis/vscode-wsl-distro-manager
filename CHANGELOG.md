@@ -6,6 +6,19 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-24
+
+### Added
+
+- A **WSL** node at the top of the view for what applies to all distros: the
+  global `.wslconfig`, with its main settings summarized (memory, processors,
+  swap, networking mode, ...), and the WSL and kernel versions.
+
+### Changed
+
+- `.wslconfig` is no longer listed under every distro; each distro shows only
+  its own `/etc/wsl.conf`.
+
 ## [1.0.1] - 2026-09-23
 
 ### Changed
@@ -56,6 +69,7 @@ First release.
   lose configuration actions, and warn before being stopped or unregistered.
 - Backups and sent files run as the distro's default user and never use `sudo`.
 
-[Unreleased]: https://github.com/edtroleis/vscode-wsl-distro-manager/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/edtroleis/vscode-wsl-distro-manager/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/edtroleis/vscode-wsl-distro-manager/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/edtroleis/vscode-wsl-distro-manager/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/edtroleis/vscode-wsl-distro-manager/releases/tag/v1.0.0
