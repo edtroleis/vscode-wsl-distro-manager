@@ -4,6 +4,8 @@ import {
 	currentWindowDistro,
 	decode,
 	diskpartScript,
+	system32,
+	wslExePath,
 	encodePowerShell,
 	interopBroken,
 	interopMissingFromListing,
@@ -478,11 +480,20 @@ describe('diskpart script', () => {
 	it('pipes the commands to diskpart and writes its output to the log, with no temp script file', () => {
 		const script = diskpartScript('E:\\wsl\\Ubuntu\\ext4.vhdx', "C:\\Temp\\it's.log");
 		assert.match(script, /'select vdisk file="E:\\wsl\\Ubuntu\\ext4\.vhdx"', 'attach vdisk readonly', 'compact vdisk', 'detach vdisk', 'exit'/);
-		assert.match(script, /\| & 'diskpart\.exe' 2>&1 \| Out-File -FilePath 'C:\\Temp\\it''s\.log'/);
+		// diskpart by absolute path: a same-named program elsewhere in the PATH must not run elevated.
+		assert.match(script, /\| & "\$env:SystemRoot\\System32\\diskpart\.exe" 2>&1 \| Out-File -FilePath 'C:\\Temp\\it''s\.log'/);
 		assert.match(script, /exit \$LASTEXITCODE$/);
 	});
 
 	it('encodes for -EncodedCommand as base64 of UTF-16LE', () => {
 		assert.equal(Buffer.from(encodePowerShell('exit 0'), 'base64').toString('utf16le'), 'exit 0');
+	});
+});
+
+describe('system32', { skip: process.platform === 'win32' }, () => {
+	it('names Windows programs by absolute path, never by bare name', () => {
+		assert.equal(system32('reg.exe'), '/mnt/c/Windows/System32/reg.exe');
+		assert.equal(system32('WindowsPowerShell\\v1.0\\powershell.exe'), '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe');
+		assert.equal(wslExePath(), '/mnt/c/Windows/System32/wsl.exe');
 	});
 });

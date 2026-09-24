@@ -33,6 +33,12 @@ project follows [Semantic Versioning](https://semver.org/).
 - The `diskpart` commands no longer go through a temporary script file, which
   another program could have changed between the UAC prompt and the run; they
   are passed inside the elevated process's command line.
+- Windows programs, including the elevated PowerShell and `diskpart`, are
+  started by absolute path from `System32`, never looked up by name.
+- Backups that include folders usually holding credentials (`.ssh`, `.aws`,
+  `.kube`, ...) ask first, and say when the destination is synced to the cloud.
+- The extension declares that it supports untrusted workspaces (it reads
+  nothing from them); CI runs with a read-only token and pinned actions.
 
 ### Fixed
 

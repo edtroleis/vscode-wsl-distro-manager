@@ -56,6 +56,25 @@ export function backupOutcome(format: BackupFormat, code: number): 'ok' | 'warni
 	return partial.includes(code) ? 'warnings' : 'failed';
 }
 
+/** Home entries that usually hold credentials: keys, cloud and cluster tokens. */
+const SENSITIVE_NAMES = new Set([
+	'.ssh', '.gnupg', '.aws', '.azure', '.kube', '.docker', '.netrc', '.git-credentials',
+	'.password-store', '.vault-token', '.npmrc', '.pypirc',
+]);
+
+/**
+ * The chosen paths that are, or sit inside, a folder that usually holds
+ * credentials (".ssh", "projects/.aws", "/root/.kube/config").
+ */
+export function sensitivePaths(paths: string[]): string[] {
+	return paths.filter((p) => p.split('/').some((part) => SENSITIVE_NAMES.has(part)) || /(^|\/)\.config\/gcloud(\/|$)/.test(p));
+}
+
+/** A folder that a cloud client syncs, so a file saved there is uploaded. */
+export function isCloudSynced(windowsFolder: string): boolean {
+	return /\\(OneDrive|Dropbox|Google Drive|iCloudDrive)( - [^\\]+)?(\\|$)/i.test(windowsFolder);
+}
+
 export function isArchive(file: string): BackupFormat | undefined {
 	const lower = file.toLowerCase();
 	if (lower.endsWith('.tar.gz') || lower.endsWith('.tgz')) {
@@ -113,6 +132,27 @@ export function registerTransferCommands(register: Register, resolveDistro: Reso
 		const folder = await pickBackupFolder();
 		if (!folder) {
 			return;
+		}
+		// A backup is a plain archive: keys and tokens in it are readable by anyone
+		// who gets the file, and a synced folder uploads it. Say so before writing.
+		const sensitive = sensitivePaths(paths);
+		if (sensitive.length > 0) {
+			const proceed = vscode.l10n.t('Back Up Anyway');
+			const choice = await vscode.window.showWarningMessage(
+				vscode.l10n.t('The backup includes {0}, which usually hold credentials (keys, tokens).', sensitive.join(', ')),
+				{
+					modal: true,
+					detail:
+						vscode.l10n.t('The archive is not encrypted: anyone who gets the file can read them.') +
+						(isCloudSynced(folder)
+							? ' ' + vscode.l10n.t('{0} is synced to the cloud, so the file will be uploaded there.', folder)
+							: ''),
+				},
+				proceed,
+			);
+			if (choice !== proceed) {
+				return;
+			}
 		}
 		const fileName = backupFileName(distro.name, new Date(), format.format);
 		const outWindows = path.win32.join(folder, fileName);
@@ -219,7 +259,7 @@ export function registerTransferCommands(register: Register, resolveDistro: Reso
 				[
 					{
 						label: vscode.l10n.t('Send and extract'),
-						description: vscode.l10n.t('Restores the backup in {0}; files with the same names are overwritten', access.path),
+						description: vscode.l10n.t('Restores the backup in {0}; files with the same names are overwritten. Only for archives you trust.', access.path),
 						extract: true,
 					},
 					{ label: vscode.l10n.t('Only send'), description: archives.join(', '), extract: false },

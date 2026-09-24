@@ -56,6 +56,7 @@ The user interface is checked by hand before each release with
 - **Every user-visible string goes through `vscode.l10n.t()`**, with `{0}`
   placeholders instead of string concatenation. Write whole sentences: a
   sentence assembled from fragments cannot be translated.
+- **Programs by absolute path** (`wsl.system32()`), never by bare name.
 - **Never `wsl -u root`.** WSL grants root without a password, bypassing the
   distro's `sudo` rules. Anything privileged inside a distro goes through its
   `sudo`, after the user agrees, with any password on standard input. Nothing

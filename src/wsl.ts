@@ -28,17 +28,27 @@ export function decode(buf: Buffer): string {
 	return buf.toString('utf8');
 }
 
+/**
+ * A program in Windows' System32, by absolute path. Programs are never looked
+ * up by bare name: a same-named executable earlier in the PATH (or, on older
+ * runtimes, in the current folder) would run instead, and some of these run
+ * with administrator rights after a UAC prompt.
+ */
+export function system32(program: string): string {
+	if (process.platform !== 'win32') {
+		return `/mnt/c/Windows/System32/${program.replace(/\\/g, '/')}`;
+	}
+	return path.win32.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', program);
+}
+
+/** wslpath, by absolute path, when the extension runs inside WSL. */
+const WSLPATH = '/usr/bin/wslpath';
+
 export function wslExePath(): string {
 	const configured = vscode.workspace.getConfiguration('wslManager').get<string>('wslExePath');
-	if (configured) {
-		return configured;
-	}
 	// Even with extensionKind "ui" the host can be Linux when the window is
-	// connected to a distro; in that case we call wsl.exe through interop.
-	if (process.platform !== 'win32') {
-		return '/mnt/c/Windows/System32/wsl.exe';
-	}
-	return 'wsl.exe';
+	// connected to a distro; system32() then points at wsl.exe through interop.
+	return configured || system32('wsl.exe');
 }
 
 export interface RunOptions {
@@ -98,7 +108,7 @@ export function interopBroken(binfmtDir = '/proc/sys/fs/binfmt_misc'): boolean {
  */
 function killTree(child: ChildProcess): void {
 	if (process.platform === 'win32' && child.pid !== undefined) {
-		spawn('taskkill.exe', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }).on(
+		spawn(system32('taskkill.exe'), ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }).on(
 			'error',
 			() => child.kill(),
 		);
@@ -192,14 +202,14 @@ async function windowsDir(variable: 'USERPROFILE' | 'TEMP'): Promise<string> {
 	if (cached) {
 		return cached;
 	}
-	const echoed = await spawnCapture('/mnt/c/Windows/System32/cmd.exe', ['/c', `echo %${variable}%`], {
+	const echoed = await spawnCapture(system32('cmd.exe'), ['/c', `echo %${variable}%`], {
 		cwd: '/mnt/c',
 	});
 	const windowsPath = echoed.stdout.trim();
 	if (!windowsPath || windowsPath.includes(`%${variable}%`)) {
 		throw new Error(vscode.l10n.t('Could not determine the Windows %{0}%.', variable));
 	}
-	const translated = (await spawnCapture('wslpath', ['-u', windowsPath])).stdout.trim();
+	const translated = (await spawnCapture(WSLPATH, ['-u', windowsPath])).stdout.trim();
 	windowsDirs.set(variable, translated);
 	return translated;
 }
@@ -289,7 +299,7 @@ export async function start(name: string): Promise<void> {
 	const quote = (a: string) => `'${a.replace(/'/g, "''")}'`;
 	const args = ['--distribution', name, '--exec', '/bin/sleep', '2147483647'].map(quote).join(',');
 	// PowerShell runs on Windows: a configured wslExePath only applies there as-is.
-	const exe = process.platform === 'win32' ? wslExePath() : 'wsl.exe';
+	const exe = process.platform === 'win32' ? wslExePath() : 'C:\\Windows\\System32\\wsl.exe';
 	await spawnCapture(
 		powershellPath(),
 		['-NoProfile', '-NonInteractive', '-Command', `Start-Process -FilePath ${quote(exe)} -WindowStyle Hidden -ArgumentList ${args}`],
@@ -365,9 +375,8 @@ export interface RegistryDistro {
  * only exists in the registry, one subkey per distro under HKCU\...\Lxss.
  */
 export async function registryInfo(): Promise<Map<string, RegistryDistro>> {
-	const regExe = process.platform === 'win32' ? 'reg.exe' : '/mnt/c/Windows/System32/reg.exe';
 	const result = await spawnCapture(
-		regExe,
+		system32('reg.exe'),
 		['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss', '/s'],
 		{ cwd: process.platform === 'win32' ? undefined : '/mnt/c', tolerateFailure: true },
 	);
@@ -406,7 +415,7 @@ export async function toHostPath(windowsPath: string): Promise<string> {
 	if (process.platform === 'win32') {
 		return windowsPath;
 	}
-	return (await spawnCapture('wslpath', ['-u', windowsPath])).stdout.trim();
+	return (await spawnCapture(WSLPATH, ['-u', windowsPath])).stdout.trim();
 }
 
 export interface RuntimeInfo {
@@ -457,7 +466,7 @@ export async function toWindowsPath(uri: vscode.Uri): Promise<string> {
 		if (process.platform === 'win32') {
 			return uri.fsPath;
 		}
-		return (await spawnCapture('wslpath', ['-w', uri.path])).stdout.trim();
+		return (await spawnCapture(WSLPATH, ['-w', uri.path])).stdout.trim();
 	}
 	const remote = /^wsl\+(.+)$/i.exec(uri.authority);
 	if (uri.scheme === 'vscode-remote' && remote) {
@@ -539,15 +548,19 @@ export interface CompactResult {
  * elevated process's own command line (-EncodedCommand), never through a file
  * that another program could change between the UAC prompt and the run.
  */
-export function diskpartScript(vhd: string, log: string, program = 'diskpart.exe'): string {
+export function diskpartScript(vhd: string, log: string, program = DISKPART): string {
 	const quote = (s: string) => `'${s.replace(/'/g, "''")}'`;
 	const commands = [`select vdisk file="${vhd}"`, 'attach vdisk readonly', 'compact vdisk', 'detach vdisk', 'exit'];
 	return (
 		`$commands = @(${commands.map(quote).join(', ')}); ` +
-		`$commands | & ${quote(program)} 2>&1 | Out-File -FilePath ${quote(log)} -Encoding utf8; ` +
+		`$commands | & ${program} 2>&1 | Out-File -FilePath ${quote(log)} -Encoding utf8; ` +
 		'exit $LASTEXITCODE'
 	);
 }
+
+/** PowerShell expressions for the programs of the elevated chain, by absolute path. */
+const DISKPART = '"$env:SystemRoot\\System32\\diskpart.exe"';
+const ELEVATED_POWERSHELL = '"$env:SystemRoot\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"';
 
 /** -EncodedCommand takes the script as base64 of UTF-16LE. */
 export function encodePowerShell(script: string): string {
@@ -560,7 +573,7 @@ export function encodePowerShell(script: string): string {
  * first. An elevated process cannot have its output piped back to us, so it
  * writes diskpart's output to a log file that we read afterwards.
  */
-export async function compactVhd(vhdWindowsPath: string, program = 'diskpart.exe', elevate = true): Promise<CompactResult> {
+export async function compactVhd(vhdWindowsPath: string, program = DISKPART, elevate = true): Promise<CompactResult> {
 	const vhd = await asciiPath(vhdWindowsPath);
 	const tempHost = await windowsTempDir();
 	const tempWindows = await toWindowsHostPath(tempHost);
@@ -571,7 +584,7 @@ export async function compactVhd(vhdWindowsPath: string, program = 'diskpart.exe
 
 	try {
 		const command =
-			`$p = Start-Process -FilePath powershell.exe ${elevate ? '-Verb RunAs ' : ''}-Wait -PassThru -WindowStyle Hidden ` +
+			`$p = Start-Process -FilePath ${ELEVATED_POWERSHELL} ${elevate ? '-Verb RunAs ' : ''}-Wait -PassThru -WindowStyle Hidden ` +
 			`-ArgumentList '-NoProfile','-NonInteractive','-EncodedCommand','${encoded}'; exit $p.ExitCode`;
 		const result = await spawnCapture(powershellPath(), ['-NoProfile', '-NonInteractive', '-Command', command], {
 			cwd: process.platform === 'win32' ? undefined : '/mnt/c',
@@ -619,9 +632,7 @@ export function isAscii(text: string): boolean {
 }
 
 function powershellPath(): string {
-	return process.platform === 'win32'
-		? 'powershell.exe'
-		: '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe';
+	return system32('WindowsPowerShell\\v1.0\\powershell.exe');
 }
 
 /** Inverse of toHostPath(): a path on this host as Windows sees it. */
@@ -629,7 +640,7 @@ async function toWindowsHostPath(hostPath: string): Promise<string> {
 	if (process.platform === 'win32') {
 		return hostPath;
 	}
-	return (await spawnCapture('wslpath', ['-w', hostPath])).stdout.trim();
+	return (await spawnCapture(WSLPATH, ['-w', hostPath])).stdout.trim();
 }
 
 /**

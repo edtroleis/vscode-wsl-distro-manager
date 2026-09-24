@@ -1,6 +1,6 @@
 import assert = require('node:assert/strict');
 import { describe, it } from 'node:test';
-import { backupCommand, backupFileName, backupOutcome, extractCommand, isArchive, parseExcludes } from '../transfer';
+import { backupCommand, backupFileName, backupOutcome, extractCommand, isArchive, isCloudSynced, parseExcludes, sensitivePaths } from '../transfer';
 import { parseFolderAccess, parseHomeListing } from '../wsl';
 
 describe('backupFileName', () => {
@@ -86,5 +86,33 @@ describe('parseFolderAccess', () => {
 
 	it('denies when the distro gave no answer', () => {
 		assert.deepEqual(parseFolderAccess('', '/x'), { state: 'denied', path: '/x' });
+	});
+});
+
+describe('sensitivePaths', () => {
+	it('flags folders that usually hold credentials, also nested or absolute', () => {
+		assert.deepEqual(sensitivePaths(['code', '.ssh', 'projects/app/.aws', '/root/.kube/config', '.config/gcloud', 'notes.txt']), [
+			'.ssh',
+			'projects/app/.aws',
+			'/root/.kube/config',
+			'.config/gcloud',
+		]);
+	});
+
+	it('does not flag look-alikes', () => {
+		assert.deepEqual(sensitivePaths(['ssh-notes', '.sshrc-backup', 'aws-scripts', '.config']), []);
+	});
+});
+
+describe('isCloudSynced', () => {
+	it('recognizes folders that cloud clients upload', () => {
+		assert.equal(isCloudSynced('C:\\Users\\u\\OneDrive\\Área de Trabalho'), true);
+		assert.equal(isCloudSynced('C:\\Users\\u\\OneDrive - Contoso\\Desktop'), true);
+		assert.equal(isCloudSynced('C:\\Users\\u\\Dropbox'), true);
+	});
+
+	it('does not flag local folders', () => {
+		assert.equal(isCloudSynced('C:\\Users\\u\\Desktop'), false);
+		assert.equal(isCloudSynced('D:\\Backups\\OneDriveOld'), false);
 	});
 });

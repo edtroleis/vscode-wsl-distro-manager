@@ -77,6 +77,7 @@ Then run **Developer: Reload Window**.
 ### Backups and sending files
 - [ ] *Back Up Folders...* lists the home folder and saves `<distro>-backup-<date>.tar.gz` to the real Desktop (also when it is in OneDrive), without `node_modules`. *Show in Folder* opens it.
 - [ ] Choosing `.zip` in a distro without `zip` says so.
+- [ ] Including `.ssh` (or `.aws`, `.kube`) asks first, says the archive is not encrypted, and mentions the cloud when the destination is in OneDrive.
 - [ ] *Send Files to Distro...* copies to `~`. Sending to `/root` reports that there is no permission and changes nothing.
 - [ ] Sending a file that already exists asks, in the prompt, whether to overwrite or skip.
 - [ ] Sending a backup asks, in the prompt, *Send and extract* or *Only send*; extracting restores it. No question appears as a notification.

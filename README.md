@@ -246,8 +246,20 @@ installed, the view offers *Install Distro* and *Import Distro* instead.
 - **No distro system files are edited.** Files such as `/etc/wsl.conf` are left
   to `sudo` inside the distro. The only configuration file the extension writes
   is your Windows `%USERPROFILE%\.wslconfig`.
+- **Programs by absolute path.** Windows programs (`wsl.exe`, `reg.exe`,
+  PowerShell, `diskpart`) are started from `System32` by full path, never looked
+  up by name, so a same-named program elsewhere cannot run in their place.
 - **No shell injection.** Commands are started with explicit argument lists;
   names and paths are passed as arguments, never pasted into a shell script.
+- **Backups warn about credentials.** A backup is an unencrypted archive. When
+  it includes folders that usually hold credentials (`.ssh`, `.aws`, `.kube`,
+  `.gnupg`, ...), the extension asks first, and says so when the destination is
+  synced to the cloud (for example a Desktop in OneDrive). Extract only
+  archives you trust.
+- **Restricted Mode.** The extension reads and runs nothing from the workspace,
+  so it stays available in untrusted workspaces.
+- **Release pipeline.** CI runs with a read-only token; the release job alone
+  can write, and GitHub Actions are pinned to commit hashes.
 
 Report security issues privately through GitHub's
 [security advisories](https://github.com/edtroleis/vscode-wsl-distro-manager/security/advisories/new).

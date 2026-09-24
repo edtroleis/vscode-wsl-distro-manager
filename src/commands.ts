@@ -26,7 +26,8 @@ function terminalWslPath(): string {
 	if (configured) {
 		return configured;
 	}
-	return vscode.env.remoteName === 'wsl' ? '/mnt/c/Windows/System32/wsl.exe' : 'wsl.exe';
+	// Absolute, never looked up by name (see wsl.system32).
+	return vscode.env.remoteName === 'wsl' ? '/mnt/c/Windows/System32/wsl.exe' : wsl.system32('wsl.exe');
 }
 
 async function pickDistro(
