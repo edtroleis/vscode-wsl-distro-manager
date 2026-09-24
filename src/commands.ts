@@ -386,26 +386,6 @@ export function registerCommands(
 		tree.refresh();
 	});
 
-	register('wslManager.setVersion', async (arg: unknown) => {
-		const distro = await resolveDistro(arg, vscode.l10n.t('Convert which distro?'));
-		if (!distro) {
-			return;
-		}
-		const target = distro.version === 2 ? 1 : 2;
-		const ok = await confirmDistroAction(
-			distro.name,
-			vscode.l10n.t('Convert "{0}" from WSL {1} to WSL {2}? The conversion copies the entire file system and may take several minutes.', distro.name, distro.version, target),
-			vscode.l10n.t('Convert to WSL {0}', target),
-		);
-		if (!ok) {
-			return;
-		}
-		await withProgress(vscode.l10n.t('Converting {0} to WSL {1}...', distro.name, target), () =>
-			wsl.setVersion(distro.name, target as 1 | 2),
-		);
-		tree.refresh();
-	});
-
 	register('wslManager.export', async (arg: unknown) => {
 		const distro = await resolveDistro(arg, vscode.l10n.t('Export which distro?'));
 		if (!distro) {

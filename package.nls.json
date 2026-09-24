@@ -16,7 +16,6 @@
   "command.export": "Export (Backup)...",
   "command.compact": "Compact Disk...",
   "command.move": "Move to Another Folder...",
-  "command.setVersion": "Convert to WSL 1 / WSL 2...",
   "command.unregister": "Unregister Distro...",
   "command.copyName": "Copy Name",
   "config.wslExePath": "Path to `wsl.exe`. Empty = auto-detect (`wsl.exe` on Windows, `/mnt/c/Windows/System32/wsl.exe` when the window is connected to WSL).",

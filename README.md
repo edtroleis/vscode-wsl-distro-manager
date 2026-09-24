@@ -59,7 +59,7 @@ themselves.
 - Open a terminal, or a new VS Code window connected to the distro.
 - Install distros from the official online catalog, with the name and location
   you choose, and move a distro's disk to another folder or drive.
-- Set the default distro, convert between WSL 1 and WSL 2, or shut down WSL.
+- Set the default distro, restart WSL, or shut it down.
 - Edit the global `.wslconfig` from the **WSL** node at the top of the view,
   which also summarizes its main settings and shows the WSL and kernel
   versions. Changes apply only after WSL restarts (Windows does not need to):
@@ -70,7 +70,7 @@ themselves.
 
 Every action is one right-click away:
 
-![Context menu of a distro: open in a new window or terminal; stop and restart; set as default and convert; export, compact disk, move; back up folders, send files; copy name; unregister.](images/context-menu.png)
+![Context menu of a distro: open in a new window or terminal; stop and restart; set as default; export, compact disk, move; back up folders, send files; copy name; unregister.](images/context-menu.png)
 
 ## Requirements
 

@@ -61,6 +61,8 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Removed
 
+- Converting a distro between WSL 1 and WSL 2. Use `wsl --set-version <distro> <1|2>`
+  in a terminal if you need it.
 - Editing a distro's `/etc/wsl.conf`. WSL lets your Windows account enter any
   distro as root without a password, so the extension saved system files with
   no `sudo` prompt at all; a mistake there can keep a distro from starting.

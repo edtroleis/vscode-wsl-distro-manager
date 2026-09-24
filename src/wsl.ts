@@ -275,8 +275,6 @@ export function parseDistroList(quiet: string, running: string, verbose: string)
 
 export const terminate = (name: string) => run(['--terminate', name]);
 export const setDefault = (name: string) => run(['--set-default', name]);
-export const setVersion = (name: string, version: 1 | 2) =>
-	run(['--set-version', name, String(version)]);
 export const shutdown = () => run(['--shutdown']);
 export const unregister = (name: string) => run(['--unregister', name]);
 
@@ -520,7 +518,7 @@ export function isCurrentWindowDistro(name: string): boolean {
 }
 
 /**
- * Distros created and driven by other tools. Stopping, converting, or
+ * Distros created and driven by other tools. Stopping, moving, or
  * unregistering them from here breaks that tool, so the UI labels them and
  * warns before touching them.
  */

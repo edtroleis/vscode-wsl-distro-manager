@@ -56,7 +56,7 @@ Then run **Developer: Reload Window**.
 - [ ] **Repair Windows Interop** shows the exact command, runs it through `sudo`, asks for the password only if the distro requires it, rejects a wrong one without changes, and reports success.
 
 ### Distros managed by other tools
-- [ ] Podman and Docker distros show the tool's name, and their context menu has no *Set as Default*, *Convert*, *Compact Disk*, *Move*, *Back Up Folders*, or *Send Files*.
+- [ ] Podman and Docker distros show the tool's name, and their context menu has no *Set as Default*, *Compact Disk*, *Move*, *Back Up Folders*, or *Send Files*.
 - [ ] *Stop* on one of them warns that the tool manages it.
 - [ ] `wslManager.showManagedDistros: false` hides them; `true` shows them again. With only managed distros installed and the setting off, the view says they are hidden.
 
@@ -115,4 +115,4 @@ publishing.
 | `compact.png` *(retake: shows `.wslconfig` under the distro)* | The VHDX row with reclaimable space and the *Compact Disk* confirmation. |
 | `compact-shutdown.png` | The confirmation to shut WSL down for a compaction. |
 | `compact-progress.png` | The compaction progress with the elapsed time. |
-| `context-menu.png` *(retake: shows Edit /etc/wsl.conf, which was removed)* | The context menu of a running distro. |
+| `context-menu.png` *(retake: shows Edit /etc/wsl.conf and Convert, which were removed)* | The context menu of a running distro. |

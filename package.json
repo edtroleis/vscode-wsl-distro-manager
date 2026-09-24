@@ -194,11 +194,6 @@
         "icon": "$(cloud-upload)"
       },
       {
-        "command": "wslManager.setVersion",
-        "title": "%command.setVersion%",
-        "category": "WSL Distro Manager"
-      },
-      {
         "command": "wslManager.unregister",
         "title": "%command.unregister%",
         "category": "WSL Distro Manager",
@@ -293,11 +288,6 @@
           "command": "wslManager.setDefault",
           "when": "view == wslManager.distros && viewItem =~ /^wslDistro\\.(running|stopped)$/",
           "group": "3_config@1"
-        },
-        {
-          "command": "wslManager.setVersion",
-          "when": "view == wslManager.distros && viewItem =~ /^wslDistro\\.(running|stopped)$/",
-          "group": "3_config@3"
         },
         {
           "command": "wslManager.export",
