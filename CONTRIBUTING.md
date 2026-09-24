@@ -144,6 +144,11 @@ GitHub Actions signs in to Azure with OIDC and gets a short-lived token; no
 secret is stored. It needs an Azure subscription (a free one works; a managed
 identity costs nothing).
 
+Run the `az` commands in [Azure Cloud Shell](https://portal.azure.com/#cloudshell/)
+(Bash; already signed in), or install the Azure CLI (on Fedora,
+`sudo dnf install azure-cli`) and run `az login` first. Check the subscription
+with `az account show`.
+
 1. Create a user-assigned managed identity:
 
    ```bash
