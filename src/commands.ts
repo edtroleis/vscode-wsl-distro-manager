@@ -8,7 +8,7 @@ import { formatElapsed, withFileProgress, withProgress } from './progress';
 import { promptText } from './prompts';
 import { registerTransferCommands } from './transfer';
 import { DistroItem, DistroTreeProvider, InfoItem, estimateReclaimable } from './tree';
-import { distroUri, globalUri } from './configFs';
+import { globalUri } from './configFs';
 
 function config() {
 	return vscode.workspace.getConfiguration('wslManager');
@@ -136,20 +136,6 @@ async function confirmIfManaged(distro: string, message: string, confirmLabel: s
 		confirmLabel,
 	);
 	return choice === confirmLabel;
-}
-
-/** Confirms restarting the current window's distro; any other distro passes through. */
-export async function confirmRestartIfCurrentWindow(distro: string): Promise<boolean> {
-	if (!wsl.isCurrentWindowDistro(distro)) {
-		return true;
-	}
-	const restart = vscode.l10n.t('Restart');
-	const choice = await vscode.window.showWarningMessage(
-		vscode.l10n.t('Restart "{0}"?', distro),
-		{ modal: true, detail: vscode.l10n.t('"{0}" is the distro of this window. {1}', distro, windowWarning()) },
-		restart,
-	);
-	return choice === restart;
 }
 
 /**
@@ -577,18 +563,6 @@ export function registerCommands(
 
 	register('wslManager.editWslConfig', async () => {
 		const doc = await vscode.workspace.openTextDocument(globalUri());
-		await vscode.window.showTextDocument(doc);
-	});
-
-	register('wslManager.editWslConf', async (arg: unknown) => {
-		const distro = await resolveDistro(arg, vscode.l10n.t('Edit wsl.conf of which distro?'));
-		if (!distro) {
-			return;
-		}
-		if (!(await confirmIfManaged(distro.name, vscode.l10n.t('Edit /etc/wsl.conf of "{0}"?', distro.name), vscode.l10n.t('Edit')))) {
-			return;
-		}
-		const doc = await vscode.workspace.openTextDocument(distroUri(distro.name));
 		await vscode.window.showTextDocument(doc);
 	});
 

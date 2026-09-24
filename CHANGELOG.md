@@ -16,8 +16,14 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- `.wslconfig` is no longer listed under every distro; each distro shows only
-  its own `/etc/wsl.conf`.
+- `.wslconfig` is no longer listed under every distro.
+
+### Removed
+
+- Editing a distro's `/etc/wsl.conf`. WSL lets your Windows account enter any
+  distro as root without a password, so the extension saved system files with
+  no `sudo` prompt at all; a mistake there can keep a distro from starting.
+  Edit it inside the distro with `sudo`, where the distro's own rules apply.
 
 ## [1.0.1] - 2026-09-23
 

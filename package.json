@@ -35,8 +35,7 @@
     "compact",
     "backup",
     "monitor",
-    "wslconfig",
-    "wsl.conf"
+    "wslconfig"
   ],
   "extensionKind": [
     "ui",
@@ -150,12 +149,6 @@
         "title": "%command.setDefault%",
         "category": "WSL Distro Manager",
         "icon": "$(star-full)"
-      },
-      {
-        "command": "wslManager.editWslConf",
-        "title": "%command.editWslConf%",
-        "category": "WSL Distro Manager",
-        "icon": "$(settings)"
       },
       {
         "command": "wslManager.export",
@@ -287,11 +280,6 @@
           "command": "wslManager.setDefault",
           "when": "view == wslManager.distros && viewItem =~ /^wslDistro\\.(running|stopped)$/",
           "group": "3_config@1"
-        },
-        {
-          "command": "wslManager.editWslConf",
-          "when": "view == wslManager.distros && viewItem =~ /^wslDistro\\.(running|stopped)$/",
-          "group": "3_config@2"
         },
         {
           "command": "wslManager.setVersion",

@@ -112,17 +112,6 @@ export class InfoItem extends vscode.TreeItem {
 	}
 }
 
-class ConfigFileItem extends vscode.TreeItem {
-	constructor(parent: DistroItem, label: string, description: string, command: string) {
-		super(label, vscode.TreeItemCollapsibleState.None);
-		this.id = `${parent.id}/config/${label}`;
-		this.description = description;
-		this.iconPath = new vscode.ThemeIcon('gear');
-		this.contextValue = 'wslConfigFile';
-		this.command = { command, title: vscode.l10n.t('Edit {0}', label), arguments: [parent] };
-	}
-}
-
 /**
  * The VHDX only grows: space freed inside the distro stays allocated in the
  * file. Comparing its size with what the distro actually uses (known only while
@@ -404,9 +393,6 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 			}
 		}
 
-		children.push(
-			new ConfigFileItem(item, '/etc/wsl.conf', vscode.l10n.t('this distro'), 'wslManager.editWslConf'),
-		);
 		return children;
 	}
 

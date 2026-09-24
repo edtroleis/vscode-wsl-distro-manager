@@ -14,7 +14,7 @@ Windows 11); each section says what goes wrong without the workaround.
 | [`src/transfer.ts`](../src/transfer.ts) | Folder backups and sending files into a distro. |
 | [`src/monitor.ts`](../src/monitor.ts) | Live CPU and memory, shared between VS Code windows. |
 | [`src/wsl.ts`](../src/wsl.ts) | Everything that runs `wsl.exe`, `reg.exe`, PowerShell, or `diskpart`, plus the parsers for their output. |
-| [`src/configFs.ts`](../src/configFs.ts) | File system provider that reads and writes `/etc/wsl.conf` as root and `.wslconfig` on Windows. |
+| [`src/configFs.ts`](../src/configFs.ts) | File system provider for the global `.wslconfig` on Windows, which opens a template when the file does not exist yet. |
 | [`src/progress.ts`](../src/progress.ts), [`src/prompts.ts`](../src/prompts.ts) | Progress notifications and text prompts with a Confirm button. |
 
 Parsing is kept in pure functions (`parseDistroList`, `parseRegistry`,
@@ -144,12 +144,12 @@ still runs, so it never boots a distro that just stopped.
 
 ## Files inside distros
 
-**`/etc/wsl.conf` needs root.** The `\\wsl.localhost` share accesses a distro
-as its default user, so saving to `/etc` fails. A `FileSystemProvider` on the
-`wsl-config:` scheme reads and writes through `wsl -u root`, converting CRLF to
-LF on save. The distro name is in the URI path, not the authority, because VS
-Code lowercases the authority and names such as `FedoraLinux-43` and
-`fedora-linux-43` can coexist.
+**Root is used as little as possible.** WSL lets the Windows account enter
+any distro as root with `wsl -u root`, with no password: the distro's `sudo`
+rules do not apply. The extension therefore never edits distro files as root
+(it used to edit `/etc/wsl.conf`, and that was removed in 1.1.0). Root is used
+only where nothing else works and the command is fixed: `fstrim` before a
+compaction, and re-registering the `WSLInterop` entry.
 
 **Backups and sent files run as the default user.** Archivers run with
 `wsl --cd ~ --exec`, so no shell parses paths or patterns. Folder permissions

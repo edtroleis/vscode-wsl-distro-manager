@@ -347,28 +347,6 @@ export function parseOnlineList(stdout: string): OnlineDistro[] {
 	return distros;
 }
 
-/**
- * Reads a file inside the distro as root. Going through `wsl --exec` instead of
- * the \\wsl.localhost share avoids "permission denied" under /etc, since the
- * share accesses the distro as the default user. The path is passed as a shell
- * argument ($1) so it is never reinterpreted.
- */
-export async function readFileAsRoot(distro: string, path: string): Promise<string | undefined> {
-	const result = await run(
-		['--distribution', distro, '--user', 'root', '--exec', '/bin/sh', '-c', 'cat "$1"', 'sh', path],
-		{ tolerateFailure: true },
-	);
-	return result.code === 0 ? result.stdout : undefined;
-}
-
-/** Writes a file inside the distro as root, preserving /etc permissions. */
-export async function writeFileAsRoot(distro: string, path: string, content: Buffer): Promise<void> {
-	await run(
-		['--distribution', distro, '--user', 'root', '--exec', '/bin/sh', '-c', 'cat > "$1"', 'sh', path],
-		{ stdin: content },
-	);
-}
-
 export interface RegistryDistro {
 	basePath?: string;
 	vhdFileName?: string;

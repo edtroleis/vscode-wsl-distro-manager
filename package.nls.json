@@ -13,7 +13,6 @@
   "command.terminate": "Stop (Terminate)",
   "command.restart": "Restart",
   "command.setDefault": "Set as Default Distro",
-  "command.editWslConf": "Edit /etc/wsl.conf",
   "command.export": "Export (Backup)...",
   "command.compact": "Compact Disk...",
   "command.move": "Move to Another Folder...",

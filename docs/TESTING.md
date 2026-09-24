@@ -55,13 +55,12 @@ Then run **Developer: Reload Window**.
 - [ ] Stopping a distro while another runs: `cmd.exe /c ver` still works in the other one's terminal, or works again after the next refresh. **Repair Windows Interop** reports the result.
 
 ### Distros managed by other tools
-- [ ] Podman and Docker distros show the tool's name, and their context menu has no *Set as Default*, *Edit /etc/wsl.conf*, *Convert*, *Compact Disk*, *Move*, *Back Up Folders*, or *Send Files*.
+- [ ] Podman and Docker distros show the tool's name, and their context menu has no *Set as Default*, *Convert*, *Compact Disk*, *Move*, *Back Up Folders*, or *Send Files*.
 - [ ] *Stop* on one of them warns that the tool manages it.
 - [ ] `wslManager.showManagedDistros: false` hides them; `true` shows them again.
 
 ### Configuration files
-- [ ] The **WSL** node is first in the view and expanded; it shows *Settings (.wslconfig)* with a summary of the file (or *WSL defaults*) and *Version* with the WSL and kernel versions. Distros no longer list `.wslconfig`.
-- [ ] *Edit /etc/wsl.conf* opens the file; saving offers to restart the distro.
+- [ ] The **WSL** node is first in the view and expanded; it shows *Settings (.wslconfig)* with a summary of the file (or *WSL defaults*) and *Version* with the WSL and kernel versions. Distros list no configuration files, and no menu offers to edit `/etc/wsl.conf`.
 - [ ] Clicking *Settings (.wslconfig)* opens `%USERPROFILE%\.wslconfig`; saving updates the summary and offers to run `wsl --shutdown`.
 - [ ] Collapsing the **WSL** node keeps it collapsed across refreshes.
 
@@ -106,9 +105,9 @@ publishing.
 
 | File | Shows |
 |---|---|
-| `demo.gif` | The top of the README: expanding a running distro (live metrics, reclaimable space), the context menu, and a backup. Under 5 MB, recorded with ScreenToGif at 12 fps. |
+| `demo.gif` *(retake: shows .wslconfig under the distro and Edit /etc/wsl.conf)* | The top of the README: expanding a running distro (live metrics, reclaimable space), the context menu, and a backup. Under 5 MB, recorded with ScreenToGif at 12 fps. |
 | `overview.png` *(retake: shows `.wslconfig` under the distro)* | Several distros, one expanded and running: live metrics, details, reclaimable VHDX space, Podman labels. |
 | `compact.png` *(retake: shows `.wslconfig` under the distro)* | The VHDX row with reclaimable space and the *Compact Disk* confirmation. |
 | `compact-shutdown.png` | The confirmation to shut WSL down for a compaction. |
 | `compact-progress.png` | The compaction progress with the elapsed time. |
-| `context-menu.png` | The context menu of a running distro. |
+| `context-menu.png` *(retake: shows Edit /etc/wsl.conf, which was removed)* | The context menu of a running distro. |

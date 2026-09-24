@@ -1,8 +1,7 @@
 import * as vscode from 'vscode';
-import { SCHEME, WslConfigFileSystem, describe, targetDistro } from './configFs';
-import { confirmRestartIfCurrentWindow, registerCommands } from './commands';
+import { SCHEME, WslConfigFileSystem } from './configFs';
+import { registerCommands } from './commands';
 import { DistroTreeProvider } from './tree';
-import * as wsl from './wsl';
 
 export function activate(context: vscode.ExtensionContext): void {
 	context.subscriptions.push(
@@ -30,34 +29,13 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 /**
- * Neither wsl.conf nor .wslconfig take effect immediately: the first requires
- * rebooting the distro, the second shutting down the WSL VM. We offer the right
- * action on save.
+ * .wslconfig does not take effect until the WSL VM restarts, so offer that on
+ * save. Only the global .wslconfig is served by the wsl-config: scheme.
  */
 async function onConfigSaved(document: vscode.TextDocument): Promise<void> {
 	if (document.uri.scheme !== SCHEME) {
 		return;
 	}
-	const distro = targetDistro(document.uri);
-
-	if (distro) {
-		const choice = await vscode.window.showInformationMessage(
-			vscode.l10n.t('{0} saved. Restart "{1}" to apply it?', describe(document.uri), distro),
-			vscode.l10n.t('Restart Distro'),
-		);
-		if (choice && (await confirmRestartIfCurrentWindow(distro))) {
-			await vscode.window.withProgress(
-				{ location: vscode.ProgressLocation.Notification, title: vscode.l10n.t('Restarting {0}...', distro) },
-				async () => {
-					await wsl.terminate(distro);
-					await wsl.start(distro);
-				},
-			);
-			await vscode.commands.executeCommand('wslManager.refresh');
-		}
-		return;
-	}
-
 	// The WSL node summarizes .wslconfig: show the new values right away.
 	void vscode.commands.executeCommand('wslManager.refresh');
 	const choice = await vscode.window.showInformationMessage(

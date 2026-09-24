@@ -59,14 +59,15 @@ themselves.
 - Install distros from the official online catalog, with the name and location
   you choose, and move a distro's disk to another folder or drive.
 - Set the default distro, convert between WSL 1 and WSL 2, or shut down WSL.
-- Edit a distro's `/etc/wsl.conf` (saved as root) from the distro, and the
-  global `.wslconfig` from the **WSL** node at the top of the view, which also
-  summarizes its main settings and shows the WSL and kernel versions. On save,
-  the extension offers the step that applies the change.
+- Edit the global `.wslconfig` from the **WSL** node at the top of the view,
+  which also summarizes its main settings and shows the WSL and kernel
+  versions. On save, the extension offers to run `wsl --shutdown` to apply it.
+  Distro system files such as `/etc/wsl.conf` are left to `sudo` inside the
+  distro.
 
 Every action is one right-click away:
 
-![Context menu of a distro: open in a new window or terminal; stop and restart; set as default, edit wsl.conf, convert; export, compact disk, move; back up folders, send files; copy name; unregister.](images/context-menu.png)
+![Context menu of a distro: open in a new window or terminal; stop and restart; set as default and convert; export, compact disk, move; back up folders, send files; copy name; unregister.](images/context-menu.png)
 
 ## Requirements
 

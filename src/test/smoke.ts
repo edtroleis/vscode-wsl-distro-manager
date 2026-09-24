@@ -87,9 +87,6 @@ async function main(): Promise<void> {
 			`${i.prettyName} | ${i.kernel} | user ${i.user} | used ${((i.diskUsed ?? 0) / 1024 ** 3).toFixed(1)} GB`,
 		);
 		await check('live metrics', () => sampleMetrics(distro.name));
-		await check('read /etc/wsl.conf as root', () => wsl.readFileAsRoot(distro.name, '/etc/wsl.conf'), (c) =>
-			c === undefined ? 'absent' : `${c.split('\n').length} lines`,
-		);
 	}
 
 	console.log(failures ? `\n${failures} check(s) failed.` : '\nAll checks passed.');
