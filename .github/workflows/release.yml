@@ -44,13 +44,13 @@ jobs:
 
       - name: Package
         if: steps.status.outputs.published == 'false'
-        run: npx vsce package --out "wsl-distro-manager-${{ steps.status.outputs.version }}.vsix"
+        run: npx vsce package --out "vscode-wsl-distro-manager-${{ steps.status.outputs.version }}.vsix"
 
       - name: Publish to the Marketplace
         if: steps.status.outputs.published == 'false'
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npx vsce publish --packagePath "wsl-distro-manager-${{ steps.status.outputs.version }}.vsix"
+        run: npx vsce publish --packagePath "vscode-wsl-distro-manager-${{ steps.status.outputs.version }}.vsix"
 
       - name: Tag and create the GitHub release
         if: steps.status.outputs.published == 'false'
@@ -67,8 +67,8 @@ jobs:
           ' CHANGELOG.md > notes.md
           [ -s notes.md ] || echo "See CHANGELOG.md." > notes.md
           if gh release view "v$VERSION" >/dev/null 2>&1; then
-            gh release upload "v$VERSION" "wsl-distro-manager-$VERSION.vsix" --clobber
+            gh release upload "v$VERSION" "vscode-wsl-distro-manager-$VERSION.vsix" --clobber
           else
-            gh release create "v$VERSION" "wsl-distro-manager-$VERSION.vsix" \
+            gh release create "v$VERSION" "vscode-wsl-distro-manager-$VERSION.vsix" \
               --target "$GITHUB_SHA" --title "WSL Distro Manager $VERSION" --notes-file notes.md
           fi
