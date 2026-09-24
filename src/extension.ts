@@ -2,15 +2,26 @@ import * as vscode from 'vscode';
 import { SCHEME, WslConfigFileSystem } from './configFs';
 import { registerCommands } from './commands';
 import { initPending, markPending } from './pending';
-import { DistroTreeProvider } from './tree';
+import { DistroTreeProvider, setExtensionUri } from './tree';
+import { log } from './log';
 
 export function activate(context: vscode.ExtensionContext): void {
 	initPending(context);
-	context.subscriptions.push(
-		vscode.workspace.registerFileSystemProvider(SCHEME, new WslConfigFileSystem(), {
-			isCaseSensitive: true,
-		}),
-	);
+	setExtensionUri(context.extensionUri);
+	try {
+		context.subscriptions.push(
+			vscode.workspace.registerFileSystemProvider(SCHEME, new WslConfigFileSystem(), {
+				isCaseSensitive: true,
+			}),
+		);
+	} catch (error) {
+		// Another copy of this extension (for example under its former ID) owns
+		// the scheme. Say so instead of failing to activate at all.
+		log().error(`wsl-config: scheme already registered: ${String(error)}`);
+		void vscode.window.showWarningMessage(
+			vscode.l10n.t('Another copy of Distro Manager for WSL is installed. Uninstall one of them, then reload the window.'),
+		);
+	}
 
 	const tree = new DistroTreeProvider();
 	const view = vscode.window.createTreeView('wslManager.distros', {

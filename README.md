@@ -236,6 +236,11 @@ Copy the `.vsix` to a Windows folder first.
 If `wsl.exe` is not on the `PATH`, set `wslManager.wslExePath`. With no distro
 installed, the view offers *Install Distro* and *Import Distro* instead.
 
+**Something else goes wrong.** Open **View > Output** and choose
+*Distro Manager for WSL*. The log lists what the extension did (for example
+each click in the backup list), never passwords or file contents; include it
+when you [report an issue](https://github.com/edtroleis/vscode-wsl-distro-manager/issues).
+
 ## Security
 
 - **No root without your consent.** WSL lets your Windows account enter any

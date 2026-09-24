@@ -15,6 +15,7 @@ class FakeQuickPick {
 	placeholder = '';
 	buttons: unknown[] = [];
 	busy = false;
+	activeItems: Item[] = [];
 	canSelectMany = false;
 	ignoreFocusOut = false;
 	matchOnDescription = false;
@@ -59,6 +60,7 @@ class FakeQuickPick {
 	}
 	show() {}
 	hide() {
+		this.hidden = true;
 		this.emit('hide');
 	}
 	dispose() {}
@@ -75,9 +77,11 @@ class FakeQuickPick {
 	checked() {
 		return this.selection.map((i) => i.key).sort();
 	}
-	accept() {
+	accept(activeKey?: string) {
+		this.activeItems = this.itemList.filter((i) => i.key === activeKey);
 		this.emit('accept');
 	}
+	hidden = false;
 }
 
 const tree: Record<string, { name: string; isDir: boolean }[]> = {
@@ -152,7 +156,24 @@ describe('backup picker (asynchronous selection events, as in VS Code)', () => {
 		fake.toggle('code');
 		await settle(100);
 		assert.deepEqual(fake.checked(), []);
+		fake.hide();
+		assert.equal(await result, undefined);
+	});
+
+	it('stays open when accepted with nothing checked, and opens the folder under the cursor', async () => {
+		const { fake, result } = start();
+		await settle();
+		fake.accept('code');
+		await settle();
+		assert.equal(fake.hidden, false);
+		assert.ok(fake.items.some((i) => i.key === 'code/README.md'), 'opened code/');
+		fake.accept('code/README.md');
+		await settle(100);
+		assert.equal(fake.hidden, false);
+		assert.match(fake.placeholder, /Nothing selected/);
+		fake.toggle('code/README.md');
+		await settle(100);
 		fake.accept();
-		assert.deepEqual((await result)?.paths, []);
+		assert.deepEqual((await result)?.paths, ['code/README.md']);
 	});
 });

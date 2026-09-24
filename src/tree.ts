@@ -34,6 +34,30 @@ export function estimateReclaimable(vhdxSize: number, used: number | undefined):
 	return gap >= Math.max(2 * 1024 ** 3, used * 0.1) ? gap : undefined;
 }
 
+let extensionUri: vscode.Uri | undefined;
+
+/** Where the bundled icons live; set once on activation. */
+export function setExtensionUri(uri: vscode.Uri): void {
+	extensionUri = uri;
+}
+
+/**
+ * The icon of a running distro, as a green SVG file. A ThemeIcon tinted with
+ * charts.green lost its color whenever the view refreshed a row that kept its
+ * id (every auto-refresh): VS Code updates the icon's shape but not its color.
+ * A file icon carries its own color. One file per theme, in charts.green.
+ */
+export function runningIcon(managed: boolean): vscode.TreeItem['iconPath'] {
+	if (!extensionUri) {
+		return new vscode.ThemeIcon(managed ? 'package' : 'vm-active', new vscode.ThemeColor('charts.green'));
+	}
+	const name = managed ? 'managed-running' : 'distro-running';
+	return {
+		light: vscode.Uri.joinPath(extensionUri, 'resources', `${name}-light.svg`),
+		dark: vscode.Uri.joinPath(extensionUri, 'resources', `${name}-dark.svg`),
+	};
+}
+
 export class DistroItem extends vscode.TreeItem {
 	constructor(readonly distro: Distro, expanded = false) {
 		super(
@@ -62,10 +86,9 @@ export class DistroItem extends vscode.TreeItem {
 		}
 		this.description = badges.join(' · ');
 
-		const icon = managed ? 'package' : distro.running ? 'vm-active' : 'vm-outline';
 		this.iconPath = distro.running
-			? new vscode.ThemeIcon(icon, new vscode.ThemeColor('charts.green'))
-			: new vscode.ThemeIcon(icon);
+			? runningIcon(!!managed)
+			: new vscode.ThemeIcon(managed ? 'package' : 'vm-outline');
 
 		const tooltip = new vscode.MarkdownString();
 		tooltip.appendMarkdown(`**${distro.name}**\n\n`);

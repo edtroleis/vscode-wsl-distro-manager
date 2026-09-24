@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import { formatBytes } from './monitor';
 import { withFileProgress, withProgress } from './progress';
 import { promptText } from './prompts';
+import { log } from './log';
 import * as wsl from './wsl';
 import { Distro } from './wsl';
 
@@ -434,6 +435,7 @@ export async function pickHomePaths(
 	};
 
 	const open = async (target: string) => {
+		log().info(`backup picker: open ${target}`);
 		pick.busy = true;
 		const entries = await listFolder(distro.name, target).catch(() => []);
 		pick.busy = false;
@@ -466,9 +468,11 @@ export async function pickHomePaths(
 		pick.onDidChangeSelection((items) => {
 			const keys = items.map((i) => i.key);
 			if (sameKeys(keys, uiChecked)) {
+				log().trace(`backup picker: echo [${keys.join(', ')}]`);
 				return;
 			}
 			if (Date.now() < settleUntil) {
+				log().debug(`backup picker: settling, keep [${desiredChecks().join(', ')}] over [${keys.join(', ')}]`);
 				showChecks(desiredChecks());
 				return;
 			}
@@ -479,6 +483,7 @@ export async function pickHomePaths(
 				selected = updateSelection(selected, folder, viewKeys, before, now);
 			}
 			uiChecked = keys;
+			log().info(`backup picker: in ${folder}, checked [${keys.join(', ')}] -> selection [${selected.join(', ')}]`);
 			updateText();
 			// Apply the rules ("Everything" vs. items) and undo clicks that cannot count.
 			const desired = desiredChecks();
@@ -486,7 +491,10 @@ export async function pickHomePaths(
 				showChecks(desired);
 			}
 		});
-		pick.onDidTriggerItemButton((e) => void open(e.item.key));
+		pick.onDidTriggerItemButton((e) => {
+			log().info(`backup picker: item button on ${e.item.key}`);
+			void open(e.item.key);
+		});
 		pick.onDidTriggerButton((button) => {
 			if (button === upButton) {
 				const up = folder.includes('/') ? folder.slice(0, folder.lastIndexOf('/')) : '.';
@@ -494,11 +502,25 @@ export async function pickHomePaths(
 			}
 		});
 		pick.onDidAccept(() => {
+			const active = (pick.activeItems ?? [])[0];
+			log().info(`backup picker: accepted with [${selected.join(', ')}] (active: ${active?.key ?? 'none'})`);
+			if (selected.length === 0 && !typed) {
+				// Nothing to back up yet: an accept here (Enter, or a click VS Code
+				// read as one) must not close the list and silently do nothing.
+				// On a folder it opens it; elsewhere it says what to do.
+				if (active?.isDir) {
+					void open(active.key);
+				} else {
+					pick.placeholder = vscode.l10n.t('Nothing selected yet. Check folders or files, then OK.');
+				}
+				return;
+			}
 			done = true;
 			resolve(selected);
 			pick.hide();
 		});
 		pick.onDidHide(() => {
+			log().info(`backup picker: hidden ${done ? 'after OK' : 'without OK (Escape, or closed by VS Code)'}`);
 			if (!done) {
 				resolve(undefined);
 			}

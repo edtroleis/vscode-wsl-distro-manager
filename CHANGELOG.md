@@ -12,6 +12,15 @@ project follows [Semantic Versioning](https://semver.org/).
 
 - *Back Up Folders*: clicking a folder or a file did not keep it checked. A
   checked folder is backed up whole, without opening it.
+- *Back Up Folders*: accepting the list with nothing checked closed it and did
+  nothing. It now stays open; on a folder, it opens the folder.
+- Running distros show a green icon again.
+- A second installed copy of the extension (for example under its former ID)
+  no longer stops this one from activating; a message says to uninstall one.
+
+### Added
+
+- A log in the Output panel (*Distro Manager for WSL*), for reporting problems.
 
 ## [0.0.1] - 2026-09-24
 

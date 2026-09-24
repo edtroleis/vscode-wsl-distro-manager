@@ -264,5 +264,7 @@
   "Installation of \"{0}\" cancelled.": "Instalação de \"{0}\" cancelada.",
   "\"{0}\" installed. Open a terminal to finish its setup (create the default user)?": "\"{0}\" instalada. Abrir um terminal para concluir a configuração (criar o usuário padrão)?",
   "Copy the name of which distro?": "Copiar o nome de qual distro?",
-  "$(check) Copied \"{0}\"": "$(check) \"{0}\" copiado"
+  "$(check) Copied \"{0}\"": "$(check) \"{0}\" copiado",
+  "Nothing selected yet. Check folders or files, then OK.": "Nada selecionado ainda. Marque pastas ou arquivos e clique em OK.",
+  "Another copy of Distro Manager for WSL is installed. Uninstall one of them, then reload the window.": "Há outra cópia do Distro Manager for WSL instalada. Desinstale uma delas e recarregue a janela."
 }

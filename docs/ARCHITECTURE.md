@@ -18,6 +18,7 @@ Windows 11); each section says what goes wrong without the workaround.
 | [`src/wsl.ts`](../src/wsl.ts) | Everything that runs `wsl.exe`, `reg.exe`, PowerShell, or `diskpart`, plus the parsers for their output. |
 | [`src/configFs.ts`](../src/configFs.ts) | File system provider for the global `.wslconfig` on Windows, which opens a template when the file does not exist yet. |
 | [`src/progress.ts`](../src/progress.ts), [`src/prompts.ts`](../src/prompts.ts) | Progress notifications and text prompts with a Confirm button. |
+| [`src/log.ts`](../src/log.ts) | The *Distro Manager for WSL* log in the Output panel. |
 
 Parsing is kept in pure functions (`parseDistroList`, `parseRegistry`,
 `parseSample`, ...) so the unit tests can exercise them with real output and no
@@ -84,7 +85,9 @@ quoting can break it.
 **The tree redraws on state changes.** For an existing tree item id, VS Code
 updates the icon shape but not its color, so a started distro kept a gray icon.
 Item ids include the state, and the provider remembers which distros are
-expanded so they stay expanded across the change.
+expanded so they stay expanded across the change. Even so, a theme-colored
+icon sometimes stayed gray, so running distros use green SVG files
+(`resources/*-running-{light,dark}.svg`), whose color is part of the file.
 
 **Windows interop disappears.** Linux runs `.exe` files through the `WSLInterop`
 entry in `binfmt_misc`, which belongs to the kernel every distro shares. When a
