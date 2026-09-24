@@ -64,15 +64,59 @@ const SENSITIVE_NAMES = new Set([
 
 /**
  * The chosen paths that are, or sit inside, a folder that usually holds
- * credentials (".ssh", "projects/.aws", "/root/.kube/config").
+ * credentials (".ssh", "projects/.aws", "/root/.kube/config"), plus the
+ * credential folders of the home folder when all of it is chosen (".").
  */
-export function sensitivePaths(paths: string[]): string[] {
-	return paths.filter((p) => p.split('/').some((part) => SENSITIVE_NAMES.has(part)) || /(^|\/)\.config\/gcloud(\/|$)/.test(p));
+export function sensitivePaths(paths: string[], homeNames: string[] = []): string[] {
+	const direct = paths.filter(
+		(p) => p.split('/').some((part) => SENSITIVE_NAMES.has(part)) || /(^|\/)\.config\/gcloud(\/|$)/.test(p),
+	);
+	// The whole home folder takes its credential folders along.
+	const viaHome = paths.includes('.') ? homeNames.filter((name) => SENSITIVE_NAMES.has(name)).map((name) => `~/${name}`) : [];
+	return [...direct, ...viaHome];
 }
 
 /** A folder that a cloud client syncs, so a file saved there is uploaded. */
 export function isCloudSynced(windowsFolder: string): boolean {
 	return /\\(OneDrive|Dropbox|Google Drive|iCloudDrive)( - [^\\]+)?(\\|$)/i.test(windowsFolder);
+}
+
+/** The path of an entry of `folder`, relative to home ('.' is home itself). */
+export function childPath(folder: string, name: string): string {
+	return folder === '.' ? name : `${folder}/${name}`;
+}
+
+/** Whether `path` is `folder` itself or somewhere inside it. */
+export function isWithin(path: string, folder: string): boolean {
+	return folder === '.' || path === folder || path.startsWith(`${folder}/`);
+}
+
+/** Drops paths already covered by a selected folder above them. */
+export function normalizeSelection(paths: string[]): string[] {
+	const unique = [...new Set(paths)];
+	return unique.filter((p) => !unique.some((other) => other !== p && isWithin(p, other)));
+}
+
+/**
+ * Applies the checkboxes of one folder's view to the whole selection. The view
+ * shows the folder itself ("Everything in ...") and its direct entries.
+ * Checking "Everything" replaces anything chosen inside that folder; checking
+ * an entry while "Everything" is checked switches to choosing entries.
+ */
+export function updateSelection(
+	selected: string[],
+	folder: string,
+	viewKeys: string[],
+	previouslyChecked: string[],
+	nowChecked: string[],
+): string[] {
+	const rest = selected.filter((p) => !viewKeys.includes(p));
+	const added = nowChecked.filter((k) => !previouslyChecked.includes(k));
+	if (added.includes(folder)) {
+		return normalizeSelection([...rest.filter((p) => !isWithin(p, folder)), folder]);
+	}
+	const entries = added.length > 0 ? nowChecked.filter((k) => k !== folder) : nowChecked;
+	return normalizeSelection([...rest, ...entries]);
 }
 
 export function isArchive(file: string): BackupFormat | undefined {
@@ -96,10 +140,11 @@ export function registerTransferCommands(register: Register, resolveDistro: Reso
 		if (!distro) {
 			return;
 		}
-		const paths = await pickHomePaths(distro);
-		if (!paths || paths.length === 0) {
+		const chosen = await pickHomePaths(distro);
+		if (!chosen || chosen.paths.length === 0) {
 			return;
 		}
+		const { paths } = chosen;
 
 		const format = await vscode.window.showQuickPick(
 			[
@@ -135,7 +180,7 @@ export function registerTransferCommands(register: Register, resolveDistro: Reso
 		}
 		// A backup is a plain archive: keys and tokens in it are readable by anyone
 		// who gets the file, and a synced folder uploads it. Say so before writing.
-		const sensitive = sensitivePaths(paths);
+		const sensitive = sensitivePaths(paths, chosen.homeNames);
 		if (sensitive.length > 0) {
 			const proceed = vscode.l10n.t('Back Up Anyway');
 			const choice = await vscode.window.showWarningMessage(
@@ -305,43 +350,140 @@ export function registerTransferCommands(register: Register, resolveDistro: Reso
 	});
 }
 
+interface PathItem extends vscode.QuickPickItem {
+	key: string;
+	isDir?: boolean;
+}
+
 /**
- * File dialogs cannot browse \\wsl.localhost (VS Code blocks UNC hosts), so
- * folders are picked from a list of the home folder, plus typed paths.
+ * Picks what to back up from the default user's home. File dialogs cannot
+ * browse \\wsl.localhost (VS Code blocks UNC hosts), so this is a quick pick
+ * that navigates folders: checking a folder takes all of it; its ➔ button opens
+ * it to choose items inside, where the first row takes the whole folder. The
+ * ↑ button goes up. Choices in every folder are kept until OK. Typed paths
+ * (relative or absolute) are asked for afterwards when "Type paths" is checked.
  */
-async function pickHomePaths(distro: Distro): Promise<string[] | undefined> {
-	const entries = await withProgress(vscode.l10n.t('Reading the home folder of {0}...', distro.name), () =>
-		wsl.listHome(distro.name),
-	);
-	const typeItem = { label: `$(edit) ${vscode.l10n.t('Type paths...')}`, description: vscode.l10n.t('Relative to home or absolute'), typed: true };
-	const picked = await vscode.window.showQuickPick(
-		[
-			typeItem,
-			...entries
-				.sort((a, b) => Number(b.isDir) - Number(a.isDir) || a.name.localeCompare(b.name))
-				.map((e) => ({ label: `$(${e.isDir ? 'folder' : 'file'}) ${e.name}`, name: e.name, typed: false })),
-		],
-		{
-			canPickMany: true,
-			title: vscode.l10n.t('What to back up from the home of {0}', distro.name),
-			placeHolder: vscode.l10n.t('Pick folders and files'),
-		},
-	);
-	if (!picked) {
+async function pickHomePaths(distro: Distro): Promise<{ paths: string[]; homeNames: string[] } | undefined> {
+	const TYPED = '\0typed';
+	const openButton: vscode.QuickInputButton = {
+		iconPath: new vscode.ThemeIcon('arrow-right'),
+		tooltip: vscode.l10n.t('Open, to choose items inside'),
+	};
+	const upButton: vscode.QuickInputButton = {
+		iconPath: new vscode.ThemeIcon('arrow-up'),
+		tooltip: vscode.l10n.t('Up one folder'),
+	};
+	let selected: string[] = [];
+	let typed = false;
+	let homeNames: string[] = [];
+	let folder = '.';
+	let viewKeys: string[] = [];
+	let shownChecked: string[] = [];
+	let syncing = false;
+
+	const pick = vscode.window.createQuickPick<PathItem>();
+	pick.canSelectMany = true;
+	pick.ignoreFocusOut = true;
+	pick.matchOnDescription = false;
+
+	const render = (items: PathItem[]) => {
+		viewKeys = items.filter((i) => i.key !== TYPED).map((i) => i.key);
+		// A folder already taken whole through a folder above shows as such.
+		const inherited = selected.some((p) => p !== folder && isWithin(folder, p));
+		shownChecked = inherited ? [folder] : viewKeys.filter((k) => selected.includes(k));
+		const count = selected.length + (typed ? 1 : 0);
+		pick.title = vscode.l10n.t('Back up from {0}: ~/{1}', distro.name, folder === '.' ? '' : folder);
+		pick.placeholder = inherited
+			? vscode.l10n.t('Already included through a folder above. Go up and uncheck it to choose items here.')
+			: count > 0
+				? vscode.l10n.t('{0} selected. Check to include; ➔ opens a folder; OK when done.', count)
+				: vscode.l10n.t('Check to include; ➔ opens a folder to choose items inside; OK when done.');
+		pick.buttons = folder === '.' ? [] : [upButton];
+		syncing = true;
+		pick.items = items;
+		pick.selectedItems = items.filter((i) => (i.key === TYPED ? typed : shownChecked.includes(i.key)));
+		syncing = false;
+	};
+
+	const open = async (target: string) => {
+		pick.busy = true;
+		const entries = await wsl.listFolder(distro.name, target).catch(() => []);
+		pick.busy = false;
+		folder = target;
+		if (target === '.') {
+			homeNames = entries.map((e) => e.name);
+		}
+		const everything: PathItem = {
+			key: target,
+			label: `$(check-all) ${target === '.' ? vscode.l10n.t('Everything in your home folder') : vscode.l10n.t('Everything in {0}/', target)}`,
+		};
+		const rows: PathItem[] = entries
+			.sort((x, y) => Number(y.isDir) - Number(x.isDir) || x.name.localeCompare(y.name))
+			.map((e) => ({
+				key: childPath(target, e.name),
+				label: `$(${e.isDir ? 'folder' : 'file'}) ${e.name}`,
+				isDir: e.isDir,
+				buttons: e.isDir ? [openButton] : undefined,
+			}));
+		const typeRow: PathItem = {
+			key: TYPED,
+			label: `$(edit) ${vscode.l10n.t('Type paths...')}`,
+			description: vscode.l10n.t('Relative to home or absolute'),
+		};
+		render(target === '.' ? [typeRow, everything, ...rows] : [everything, ...rows]);
+	};
+
+	const result = await new Promise<string[] | undefined>((resolve) => {
+		let done = false;
+		pick.onDidChangeSelection((items) => {
+			if (syncing) {
+				return;
+			}
+			typed = items.some((i) => i.key === TYPED);
+			const nowChecked = items.map((i) => i.key).filter((k) => k !== TYPED);
+			const inherited = selected.some((p) => p !== folder && isWithin(folder, p));
+			if (!inherited) {
+				selected = updateSelection(selected, folder, viewKeys, shownChecked, nowChecked);
+			}
+			render([...pick.items]);
+		});
+		pick.onDidTriggerItemButton((e) => void open(e.item.key));
+		pick.onDidTriggerButton((button) => {
+			if (button === upButton) {
+				const up = folder.includes('/') ? folder.slice(0, folder.lastIndexOf('/')) : '.';
+				void open(up);
+			}
+		});
+		pick.onDidAccept(() => {
+			done = true;
+			resolve(selected);
+			pick.hide();
+		});
+		pick.onDidHide(() => {
+			if (!done) {
+				resolve(undefined);
+			}
+			pick.dispose();
+		});
+		pick.show();
+		void open('.');
+	});
+	if (result === undefined) {
 		return undefined;
 	}
-	const paths = picked.filter((p) => !p.typed).map((p) => (p as { name: string }).name);
-	if (picked.some((p) => p.typed)) {
-		const typed = await promptText({
+
+	const paths = [...result];
+	if (typed) {
+		const answer = await promptText({
 			title: vscode.l10n.t('Paths to back up'),
 			prompt: vscode.l10n.t('Separated by commas, relative to your home (projects/app) or absolute (/etc/nginx).'),
 		});
-		if (typed === undefined) {
+		if (answer === undefined) {
 			return undefined;
 		}
-		paths.push(...typed.split(',').map((p) => p.trim()).filter(Boolean));
+		paths.push(...answer.split(',').map((p) => p.trim()).filter(Boolean));
 	}
-	return paths;
+	return { paths: normalizeSelection(paths), homeNames };
 }
 
 async function pickBackupFolder(): Promise<string | undefined> {

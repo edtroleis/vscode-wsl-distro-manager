@@ -75,6 +75,8 @@ Then run **Developer: Reload Window**.
 - [ ] *Move to Another Folder...* moves the VHDX (check *Location*), and the distro still starts.
 
 ### Backups and sending files
+- [ ] In *Back Up Folders...*, checking a folder takes all of it; its ➔ opens it to choose items inside; *Everything in ...* takes the folder again and unchecks the items; ↑ goes up; choices survive navigation, and the archive holds exactly what was checked.
+- [ ] Checking *Everything in your home folder* with `.ssh` or `.aws` in it triggers the credentials warning.
 - [ ] *Back Up Folders...* lists the home folder and saves `<distro>-backup-<date>.tar.gz` to the real Desktop (also when it is in OneDrive), without `node_modules`. *Show in Folder* opens it.
 - [ ] Choosing `.zip` in a distro without `zip` says so.
 - [ ] Including `.ssh` (or `.aws`, `.kube`) asks first, says the archive is not encrypted, and mentions the cloud when the destination is in OneDrive.

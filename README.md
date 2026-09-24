@@ -130,8 +130,11 @@ disk takes a few minutes; the notification shows the elapsed time.
 **Back Up Folders...** archives the folders and files you choose, without
 exporting the whole distro:
 
-1. Pick entries of your home folder from the list, or type paths (relative to
-   your home, or absolute).
+1. Choose what to include, starting in your home folder. Check a folder to take
+   all of it, or click its **➔** to open it and choose the folders and files
+   inside; its first row, *Everything in ...*, takes the whole folder again. The
+   **↑** button goes up, and choices in every folder are kept until **OK**. You
+   can also type paths (relative to your home, or absolute).
 2. Choose the format. `.tar.gz` is recommended: it keeps Linux permissions and
    symbolic links. `.zip` opens anywhere but loses them, so restored scripts are
    no longer executable.

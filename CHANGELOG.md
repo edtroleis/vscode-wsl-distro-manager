@@ -32,8 +32,8 @@ First release.
 - **Move** a distro's virtual disk to another folder or drive.
 - **Compact** a distro's virtual disk to give unused space back to Windows,
   with an estimate of the gain.
-- **Back up** chosen folders to a `.tar.gz` or `.zip` on the Windows Desktop or
-  another folder, and **send files** from Windows into a distro, extracting
+- **Back up** chosen folders, whole or just items inside them, to a `.tar.gz`
+  or `.zip` on the Windows Desktop or another folder, and **send files** from Windows into a distro, extracting
   backups in place.
 - **`.wslconfig` editing**, with a prompt to restart WSL on save and a pending
   mark until the change applies.

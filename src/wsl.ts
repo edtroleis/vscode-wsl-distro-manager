@@ -820,13 +820,16 @@ export interface HomeEntry {
 	isDir: boolean;
 }
 
-/** Entries of the default user's home folder, dotfiles included. */
-export async function listHome(distro: string): Promise<HomeEntry[]> {
-	const result = await runAsUser(distro, ['ls', '-1Ap']);
+/**
+ * Entries of a folder of the default user, dotfiles included. `folder` is
+ * relative to the home folder ('' or '.' for home itself).
+ */
+export async function listFolder(distro: string, folder = ''): Promise<HomeEntry[]> {
+	const result = await runAsUser(distro, ['ls', '-1Ap', '--', folder || '.']);
 	return parseHomeListing(result.stdout);
 }
 
-/** Pure part of listHome(): `ls -1Ap` marks folders with a trailing slash. */
+/** Pure part of listFolder(): `ls -1Ap` marks folders with a trailing slash. */
 export function parseHomeListing(stdout: string): HomeEntry[] {
 	return stdout
 		.split(/\r?\n/)
