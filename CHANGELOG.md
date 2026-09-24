@@ -22,6 +22,18 @@ project follows [Semantic Versioning](https://semver.org/).
 
 - `.wslconfig` is no longer listed under every distro.
 
+### Security
+
+- Nothing runs as root inside a distro without the user's consent. Repairing
+  Windows interop used to run silently as root (`wsl -u root`, which needs no
+  password); the extension now only detects the problem, as the default user,
+  and offers the repair, which runs through the distro's `sudo` and asks for
+  the password when the distro requires it.
+- Compaction no longer runs `fstrim` as root before `diskpart`.
+- The `diskpart` commands no longer go through a temporary script file, which
+  another program could have changed between the UAC prompt and the run; they
+  are passed inside the elevated process's command line.
+
 ### Fixed
 
 - With no distro installed, the view showed "Failed to query wsl.exe" instead

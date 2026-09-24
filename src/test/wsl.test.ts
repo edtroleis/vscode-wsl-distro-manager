@@ -3,7 +3,10 @@ import { afterEach, describe, it } from 'node:test';
 import {
 	currentWindowDistro,
 	decode,
+	diskpartScript,
+	encodePowerShell,
 	interopBroken,
+	interopMissingFromListing,
 	isAscii,
 	list,
 	isCurrentWindowDistro,
@@ -453,5 +456,33 @@ describe('list with no distro installed', { skip: process.platform === 'win32' }
 		fs.writeFileSync(fake, '#!/bin/sh\necho "O Subsistema do Windows para Linux nao tem distribuicoes instaladas."\nexit 1\n', { mode: 0o755 });
 		settings['wslExePath'] = fake;
 		assert.deepEqual(await list(), []);
+	});
+});
+
+describe('interopMissingFromListing', () => {
+	it('is false while WSLInterop (or WSLInterop-late) is registered', () => {
+		assert.equal(interopMissingFromListing('WSLInterop\nqemu-aarch64\nregister\nstatus\n'), false);
+		assert.equal(interopMissingFromListing('WSLInterop-late register status'), false);
+	});
+
+	it('is true when binfmt_misc is mounted but the entry is gone', () => {
+		assert.equal(interopMissingFromListing('qemu-aarch64\nregister\nstatus\n'), true);
+	});
+
+	it('does not guess when binfmt_misc is not mounted', () => {
+		assert.equal(interopMissingFromListing(''), false);
+	});
+});
+
+describe('diskpart script', () => {
+	it('pipes the commands to diskpart and writes its output to the log, with no temp script file', () => {
+		const script = diskpartScript('E:\\wsl\\Ubuntu\\ext4.vhdx', "C:\\Temp\\it's.log");
+		assert.match(script, /'select vdisk file="E:\\wsl\\Ubuntu\\ext4\.vhdx"', 'attach vdisk readonly', 'compact vdisk', 'detach vdisk', 'exit'/);
+		assert.match(script, /\| & 'diskpart\.exe' 2>&1 \| Out-File -FilePath 'C:\\Temp\\it''s\.log'/);
+		assert.match(script, /exit \$LASTEXITCODE$/);
+	});
+
+	it('encodes for -EncodedCommand as base64 of UTF-16LE', () => {
+		assert.equal(Buffer.from(encodePowerShell('exit 0'), 'base64').toString('utf16le'), 'exit 0');
 	});
 });

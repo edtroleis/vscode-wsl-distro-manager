@@ -8,6 +8,7 @@ import { formatElapsed, withFileProgress, withProgress } from './progress';
 import { promptText } from './prompts';
 import { clearPending, pendingSince } from './pending';
 import { registerTransferCommands } from './transfer';
+import { offerInteropRepair, repairInterop } from './interop';
 import { DistroItem, DistroTreeProvider, InfoItem, estimateReclaimable } from './tree';
 import { globalUri } from './configFs';
 
@@ -170,15 +171,12 @@ async function confirmShutdown(
 }
 
 /**
- * Stopping a distro unregisters Windows interop in the other running distros
- * (see wsl.restoreInterop). Put it back right after our own stops.
+ * Stopping a distro makes WSL remove Windows interop from the other running
+ * distros. Check right after our own stops and offer the repair (which runs
+ * through sudo, with the user's consent).
  */
-async function healInteropAfterStop(): Promise<void> {
-	const running = (await wsl.list()).filter((d) => d.running).map((d) => d.name);
-	const restored = await wsl.restoreInterop(running).catch(() => []);
-	if (restored.length > 0) {
-		vscode.window.setStatusBarMessage(vscode.l10n.t('$(check) Restored Windows interop in {0}', restored.join(', ')), 8000);
-	}
+function healInteropAfterStop(): void {
+	void offerInteropRepair().catch(() => undefined);
 }
 
 /** The distro's VHDX, as Windows and as this host see it. */
@@ -230,14 +228,12 @@ async function releaseDisk(
 	distro: Distro,
 	vhd: string,
 	texts: { progress: string; shutdownTitle: string; shutdownLabel: string; shutdownDetail?: string },
-	beforeStop?: () => Promise<void>,
 ): Promise<{ released: boolean; restart: string[] }> {
 	let restart = distro.running ? [distro.name] : [];
 	const free = await withProgress(texts.progress, async () => {
 		if (distro.running) {
-			await beforeStop?.();
 			await wsl.terminate(distro.name);
-			await healInteropAfterStop();
+			healInteropAfterStop();
 		}
 		return wsl.waitUntilUnlocked(vhd, 5000);
 	});
@@ -351,7 +347,7 @@ export function registerCommands(
 		}
 		await withProgress(vscode.l10n.t('Stopping {0}...', distro.name), async () => {
 			await wsl.terminate(distro.name);
-			await healInteropAfterStop();
+			healInteropAfterStop();
 		});
 		tree.refresh();
 	});
@@ -540,7 +536,7 @@ export function registerCommands(
 		}
 		await withProgress(vscode.l10n.t('Unregistering {0}...', distro.name), async () => {
 			await wsl.unregister(distro.name);
-			await healInteropAfterStop();
+			healInteropAfterStop();
 		});
 		vscode.window.showInformationMessage(vscode.l10n.t('"{0}" was unregistered.', distro.name));
 		tree.refresh();
@@ -655,24 +651,13 @@ export function registerCommands(
 
 		let restart: string[] = [];
 		try {
-			const release = await releaseDisk(
-				distro,
-				vhd,
-				{
-					progress: vscode.l10n.t('Compacting {0}: releasing the disk...', distro.name),
-					shutdownTitle: vscode.l10n.t('Shut down WSL to compact "{0}"?', distro.name),
-					shutdownLabel: vscode.l10n.t('Shut Down and Compact'),
-					shutdownDetail:
-						reclaimable !== undefined ? vscode.l10n.t('Expected gain: about {0}.', formatBytes(reclaimable)) : undefined,
-				},
-				// WSL mounts with discard, so this mostly catches leftovers; it is cheap.
-				() =>
-					wsl
-						.run(['--distribution', distro.name, '--user', 'root', '--exec', '/bin/sh', '-c', 'fstrim -a'], {
-							tolerateFailure: true,
-						})
-						.then(() => undefined),
-			);
+			const release = await releaseDisk(distro, vhd, {
+				progress: vscode.l10n.t('Compacting {0}: releasing the disk...', distro.name),
+				shutdownTitle: vscode.l10n.t('Shut down WSL to compact "{0}"?', distro.name),
+				shutdownLabel: vscode.l10n.t('Shut Down and Compact'),
+				shutdownDetail:
+					reclaimable !== undefined ? vscode.l10n.t('Expected gain: about {0}.', formatBytes(reclaimable)) : undefined,
+			});
 			restart = release.restart;
 			if (!release.released) {
 				return;
@@ -900,15 +885,7 @@ export function registerCommands(
 		}
 	});
 
-	register('wslManager.repairInterop', async () => {
-		const running = (await wsl.list()).filter((d) => d.running).map((d) => d.name);
-		const restored = await withProgress(vscode.l10n.t('Checking Windows interop...'), () => wsl.restoreInterop(running));
-		vscode.window.showInformationMessage(
-			restored.length > 0
-				? vscode.l10n.t('Restored Windows interop in {0}.', restored.join(', '))
-				: vscode.l10n.t('Windows interop is working in every running distro.'),
-		);
-	});
+	register('wslManager.repairInterop', () => repairInterop());
 
 	register('wslManager.copyName', async (arg: unknown) => {
 		const distro = await resolveDistro(arg, vscode.l10n.t('Copy the name of which distro?'));

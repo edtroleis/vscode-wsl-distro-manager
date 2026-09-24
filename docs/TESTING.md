@@ -52,7 +52,8 @@ Then run **Developer: Reload Window**.
 - [ ] *Start* turns the icon green, opens no terminal window, and the distro is still running a minute later.
 - [ ] *Stop* turns the icon gray.
 - [ ] A distro started outside VS Code (for example from Windows Terminal) turns green within the refresh interval.
-- [ ] Stopping a distro while another runs: `cmd.exe /c ver` still works in the other one's terminal, or works again after the next refresh. **Repair Windows Interop** reports the result.
+- [ ] Stopping a distro while another runs: if `cmd.exe /c ver` stops working in the other one, a notification offers **Repair...** within about 15 seconds. Nothing is repaired without it.
+- [ ] **Repair Windows Interop** shows the exact command, runs it through `sudo`, asks for the password only if the distro requires it, rejects a wrong one without changes, and reports success.
 
 ### Distros managed by other tools
 - [ ] Podman and Docker distros show the tool's name, and their context menu has no *Set as Default*, *Convert*, *Compact Disk*, *Move*, *Back Up Folders*, or *Send Files*.
@@ -83,7 +84,7 @@ Then run **Developer: Reload Window**.
 
 ### Compact Disk (on a distro you can spare)
 - [ ] The first confirmation states the expected gain, or warns that there is little to reclaim.
-- [ ] Declining the UAC prompt shows an error and leaves the distro as it was.
+- [ ] Declining the UAC prompt shows an error and leaves the distro as it was, and no `wsl-distro-manager-*.log` is left in `%TEMP%`.
 - [ ] With a VS Code window connected to WSL, it refuses before stopping anything, names that window's distro, and the connected window keeps working.
 - [ ] With no window connected and another distro running, it asks to shut WSL down, lists the running distros, and offers **Shut Down and Compact**. The progress shows the elapsed time.
 - [ ] Accepting compacts the disk, reports the size before and after, and restarts the distros that were running, except Podman and Docker ones.

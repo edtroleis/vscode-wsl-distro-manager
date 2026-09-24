@@ -86,11 +86,13 @@ expanded so they stay expanded across the change.
 
 **Windows interop disappears.** Linux runs `.exe` files through the `WSLInterop`
 entry in `binfmt_misc`, which belongs to the kernel every distro shares. When a
-distro stops, the entry is removed for all of them. WSL already disables
-`systemd-binfmt --unregister`, and the entry still goes, so nothing inside a
-distro prevents it. The extension re-registers it in the running distros right
-after its own *Stop* and *Unregister*, whenever a refresh shows that a distro
-stopped, and on demand. When the extension itself runs inside WSL and a `.exe`
+distro stops, the entry is removed for all of them, a few seconds later. WSL
+already disables `systemd-binfmt --unregister`, and the entry still goes, so
+nothing inside a distro prevents it. After its own *Stop* and *Unregister*, and
+whenever a refresh shows that a distro stopped, the extension lists
+`binfmt_misc` as the default user for up to 15 seconds; if the entry is gone, it
+offers the repair (see *No root without consent*). Repairing it in one distro
+repairs all. When the extension itself runs inside WSL and a `.exe`
 fails, it checks for the missing entry and says so, instead of surfacing the
 shell's "cannot execute binary file".
 
@@ -111,9 +113,12 @@ processes running the VS Code server; if there are any, it refuses and changes
 nothing.
 
 **Compaction** runs `diskpart` (`attach vdisk readonly`, `compact vdisk`)
-elevated through `Start-Process -Verb RunAs`. An elevated process cannot pipe
-its output back, so `cmd.exe` redirects it to a log file that is read
-afterwards. `diskpart` reads its script in the legacy code page, so a VHDX path
+elevated through `Start-Process -Verb RunAs`. The commands travel inside the
+elevated PowerShell's command line (`-EncodedCommand`) and are piped into
+`diskpart`: a script file in `%TEMP%` could be changed by another program of
+the same user between the UAC prompt and the run, turning the consent into
+arbitrary `diskpart` commands. An elevated process cannot pipe its output
+back, so it writes `diskpart`'s output to a log file that is read afterwards. `diskpart` reads its script in the legacy code page, so a VHDX path
 with accents (for example under `C:\Users\joão`) is replaced by its 8.3 short
 form, which is plain ASCII; a drive without short names gets a clear error.
 
@@ -163,12 +168,14 @@ still up, so the flag stays.
 
 ## Files inside distros
 
-**Root is used as little as possible.** WSL lets the Windows account enter
-any distro as root with `wsl -u root`, with no password: the distro's `sudo`
-rules do not apply. The extension therefore never edits distro files as root
-(it used to edit `/etc/wsl.conf`, and that was removed in 1.1.0). Root is used
-only where nothing else works and the command is fixed: `fstrim` before a
-compaction, and re-registering the `WSLInterop` entry.
+**No root without consent.** WSL lets the Windows account enter any distro as
+root with `wsl -u root` and no password, bypassing the distro's `sudo` rules.
+The extension never uses it (editing `/etc/wsl.conf` and a silent interop
+repair both did, and were removed in 1.1.0). The one privileged step left,
+re-registering `WSLInterop`, runs through the distro's `sudo` after the user
+agrees: `sudo -n` first, which succeeds only if the distro allows it without a
+password, then `sudo -S` with the password on standard input. A default user
+that is root writes directly, as it would in its own terminal.
 
 **Backups and sent files run as the default user.** Archivers run with
 `wsl --cd ~ --exec`, so no shell parses paths or patterns. Folder permissions

@@ -70,7 +70,7 @@ export interface RunResult {
 export const interopBrokenMessage = () =>
 	vscode.l10n.t(
 		'Windows interop is disabled in this distro, so it cannot run wsl.exe. This is a known WSL issue: when a distro stops, interop is unregistered in every other running distro. Run "Repair Windows Interop" from a local VS Code window, or restore it here with: {0}',
-		'sudo sh -c "echo :WSLInterop:M::MZ::/init:P > /proc/sys/fs/binfmt_misc/register"',
+		INTEROP_REPAIR_COMMAND,
 	);
 
 /**
@@ -534,43 +534,50 @@ export interface CompactResult {
 }
 
 /**
+ * The PowerShell script that runs elevated: it pipes the diskpart commands in
+ * and writes diskpart's output to `log`. The commands travel inside the
+ * elevated process's own command line (-EncodedCommand), never through a file
+ * that another program could change between the UAC prompt and the run.
+ */
+export function diskpartScript(vhd: string, log: string, program = 'diskpart.exe'): string {
+	const quote = (s: string) => `'${s.replace(/'/g, "''")}'`;
+	const commands = [`select vdisk file="${vhd}"`, 'attach vdisk readonly', 'compact vdisk', 'detach vdisk', 'exit'];
+	return (
+		`$commands = @(${commands.map(quote).join(', ')}); ` +
+		`$commands | & ${quote(program)} 2>&1 | Out-File -FilePath ${quote(log)} -Encoding utf8; ` +
+		'exit $LASTEXITCODE'
+	);
+}
+
+/** -EncodedCommand takes the script as base64 of UTF-16LE. */
+export function encodePowerShell(script: string): string {
+	return Buffer.from(script, 'utf16le').toString('base64');
+}
+
+/**
  * Compacts a dynamic VHDX with diskpart, which needs administrator rights, so
  * Windows shows a UAC prompt. The disk must not be attached: stop the distro
- * first. An elevated process cannot have its output piped back to us, so cmd.exe
- * redirects diskpart's output to a log file that we read afterwards.
+ * first. An elevated process cannot have its output piped back to us, so it
+ * writes diskpart's output to a log file that we read afterwards.
  */
-export async function compactVhd(vhdWindowsPath: string): Promise<CompactResult> {
+export async function compactVhd(vhdWindowsPath: string, program = 'diskpart.exe', elevate = true): Promise<CompactResult> {
 	const vhd = await asciiPath(vhdWindowsPath);
 	const tempHost = await windowsTempDir();
 	const tempWindows = await toWindowsHostPath(tempHost);
-	const id = `wsl-distro-manager-${process.pid}-${Date.now()}`;
-	const scriptName = `${id}.txt`;
-	const logName = `${id}.log`;
-
-	const script = [
-		`select vdisk file="${vhd}"`,
-		'attach vdisk readonly',
-		'compact vdisk',
-		'detach vdisk',
-		'exit',
-		'',
-	].join('\r\n');
-	const scriptHost = path.join(tempHost, scriptName);
+	const logName = `wsl-distro-manager-${process.pid}-${Date.now()}.log`;
 	const logHost = path.join(tempHost, logName);
-	await fs.writeFile(scriptHost, script, 'utf8');
+	const logWindows = path.win32.join(tempWindows, logName);
+	const encoded = encodePowerShell(diskpartScript(vhd, logWindows, program));
 
 	try {
-		const scriptWindows = path.win32.join(tempWindows, scriptName);
-		const logWindows = path.win32.join(tempWindows, logName);
-		const quote = (s: string) => s.replace(/'/g, "''");
 		const command =
-			`$p = Start-Process -FilePath cmd.exe -Verb RunAs -Wait -PassThru -WindowStyle Hidden -ArgumentList '/c diskpart /s "${quote(scriptWindows)}" > "${quote(logWindows)}" 2>&1'; exit $p.ExitCode`;
+			`$p = Start-Process -FilePath powershell.exe ${elevate ? '-Verb RunAs ' : ''}-Wait -PassThru -WindowStyle Hidden ` +
+			`-ArgumentList '-NoProfile','-NonInteractive','-EncodedCommand','${encoded}'; exit $p.ExitCode`;
 		const result = await spawnCapture(powershellPath(), ['-NoProfile', '-NonInteractive', '-Command', command], {
 			cwd: process.platform === 'win32' ? undefined : '/mnt/c',
 			tolerateFailure: true,
 		});
-		// diskpart writes in the OEM code page; latin1 keeps the messages readable enough.
-		const log = await fs.readFile(logHost).then((b) => b.toString('latin1'), () => undefined);
+		const log = await fs.readFile(logHost, 'utf8').then((text) => text.replace(/^\uFEFF/, ''), () => undefined);
 		if (log === undefined) {
 			// The elevated process never ran: the UAC prompt was declined or failed.
 			throw new Error(
@@ -579,7 +586,6 @@ export async function compactVhd(vhdWindowsPath: string): Promise<CompactResult>
 		}
 		return { code: result.code, log };
 	} finally {
-		await fs.rm(scriptHost, { force: true });
 		await fs.rm(logHost, { force: true });
 	}
 }
@@ -704,21 +710,61 @@ export function parseVscodeConnectedDistros(commandLines: string): string[] {
  */
 const INTEROP_REGISTRATION = ':WSLInterop:M::MZ::/init:P';
 
-/** Re-registers interop where it is missing. Returns the distros where it was restored. */
-export async function restoreInterop(distros: string[]): Promise<string[]> {
-	const script =
-		`ls /proc/sys/fs/binfmt_misc 2>/dev/null | grep -q '^WSLInterop' && exit 0; echo '${INTEROP_REGISTRATION}' > /proc/sys/fs/binfmt_misc/register && echo restored`;
-	const restored: string[] = [];
+/** Pure part of interopMissing(): `ls /proc/sys/fs/binfmt_misc` output. */
+export function interopMissingFromListing(listing: string): boolean {
+	const entries = listing.split(/\s+/).filter(Boolean);
+	// Only judge when binfmt_misc is mounted (it always has "register").
+	return entries.includes('register') && !entries.some((e) => e.startsWith('WSLInterop'));
+}
+
+/**
+ * The running distros that lost Windows interop. Runs as the default user:
+ * listing binfmt_misc needs no privileges.
+ */
+export async function interopMissing(distros: string[]): Promise<string[]> {
+	const missing: string[] = [];
 	for (const distro of distros) {
-		const result = await run(['--distribution', distro, '--user', 'root', '--exec', '/bin/sh', '-c', script], {
-			tolerateFailure: true,
-		});
-		if (result.stdout.includes('restored')) {
-			restored.push(distro);
+		const result = await runAsUser(distro, ['ls', '/proc/sys/fs/binfmt_misc']);
+		if (result.code === 0 && interopMissingFromListing(result.stdout)) {
+			missing.push(distro);
 		}
 	}
-	return restored;
+	return missing;
 }
+
+export type InteropRepair = 'repaired' | 'password-needed' | 'wrong-password' | 'no-sudo' | 'denied';
+
+/**
+ * Re-registers interop through the distro's own `sudo`, so its rules apply
+ * (who may use it, whether it needs a password, logging). Never `wsl -u root`,
+ * which would bypass them. A default user that is already root writes
+ * directly. Without a password, `sudo -n` succeeds only when the distro allows
+ * it without one; with a password, it goes to `sudo -S` on standard input,
+ * never on the command line, where other processes could read it.
+ */
+export async function repairInteropWithSudo(distro: string, password?: string): Promise<InteropRepair> {
+	const write = `echo '${INTEROP_REGISTRATION}' > /proc/sys/fs/binfmt_misc/register`;
+	const script =
+		'if [ "$(id -u)" = 0 ]; then sh -c "$1"; exit $?; fi; ' +
+		'command -v sudo >/dev/null 2>&1 || exit 127; ' +
+		(password === undefined ? 'sudo -n sh -c "$1"' : 'sudo -S -p "" sh -c "$1"');
+	const result = await runAsUser(distro, ['sh', '-c', script, 'sh', write], {
+		stdin: password === undefined ? undefined : Buffer.from(`${password}\n`, 'utf8'),
+	});
+	if (result.code === 0) {
+		return 'repaired';
+	}
+	if (result.code === 127) {
+		return 'no-sudo';
+	}
+	if (/not in the sudoers|not allowed to/i.test(result.stderr)) {
+		return 'denied';
+	}
+	return password === undefined ? 'password-needed' : 'wrong-password';
+}
+
+/** The command a user can run inside a distro to repair interop by hand. */
+export const INTEROP_REPAIR_COMMAND = `sudo sh -c "echo ${INTEROP_REGISTRATION} > /proc/sys/fs/binfmt_misc/register"`;
 
 let cachedDesktop: string | undefined;
 

@@ -9,7 +9,6 @@ import {
 	managedBy,
 	readWslConfig,
 	registryInfo,
-	restoreInterop,
 	runtimeInfo,
 	summarizeWslConfig,
 	toHostPath,
@@ -17,6 +16,7 @@ import {
 	wslVersion,
 } from './wsl';
 import { clearPending, pendingSince, restartedSince } from './pending';
+import { offerInteropRepair } from './interop';
 
 /**
  * How much a compaction would likely give back, or undefined when it is not
@@ -238,7 +238,6 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 
 	/** Running distros at the last refresh, to notice distros that stopped. */
 	private lastRunning: Set<string> | undefined;
-	private restoringInterop = false;
 
 	refresh(): void {
 		this.changed.fire();
@@ -302,26 +301,19 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 	}
 
 	/**
-	 * A distro that stops, for whatever reason (Stop, idle timeout), takes
-	 * Windows interop away from every other running distro. When a refresh
-	 * shows that a distro stopped, re-register it in the ones still running.
+	 * A distro that stops, for whatever reason (Stop, idle timeout), makes WSL
+	 * remove Windows interop from every other running distro. When a refresh
+	 * shows that a distro stopped, check (as the default user) and, if interop
+	 * is gone, offer to repair it; nothing runs with privileges unless the user
+	 * agrees and sudo allows it.
 	 */
 	private healInteropIfSomethingStopped(running: Set<string>): void {
 		const previous = this.lastRunning;
 		this.lastRunning = running;
 		const stopped = previous ? [...previous].some((name) => !running.has(name)) : false;
-		if (!stopped || running.size === 0 || this.restoringInterop) {
-			return;
+		if (stopped && running.size > 0) {
+			void offerInteropRepair([...running]).catch(() => undefined);
 		}
-		this.restoringInterop = true;
-		restoreInterop([...running])
-			.then((restored) => {
-				if (restored.length > 0) {
-					vscode.window.setStatusBarMessage(vscode.l10n.t('$(check) Restored Windows interop in {0}', restored.join(', ')), 8000);
-				}
-			})
-			.catch(() => undefined)
-			.finally(() => (this.restoringInterop = false));
 	}
 
 	/**

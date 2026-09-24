@@ -56,9 +56,10 @@ The user interface is checked by hand before each release with
 - **Every user-visible string goes through `vscode.l10n.t()`**, with `{0}`
   placeholders instead of string concatenation. Write whole sentences: a
   sentence assembled from fragments cannot be translated.
-- **Root only where there is no alternative**: trimming a disk before
-  compaction and repairing interop. Never edit distro files as root: WSL grants
-  root without a password, so the extension would bypass `sudo`. Nothing shuts
+- **Never `wsl -u root`.** WSL grants root without a password, bypassing the
+  distro's `sudo` rules. Anything privileged inside a distro goes through its
+  `sudo`, after the user agrees, with any password on standard input. Nothing
+  elevated reads a file that another program could change first. Nothing shuts
   WSL down while VS Code windows are connected to it.
 
 ## Localization

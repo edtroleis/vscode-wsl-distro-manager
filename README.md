@@ -48,8 +48,9 @@ themselves.
   that would disconnect a window are refused or confirmed explicitly.
 - Distros owned by Docker Desktop, Podman, or Rancher Desktop are labeled and
   protected.
-- Windows interop, which WSL removes from running distros when one stops, is
-  repaired automatically (see [Troubleshooting](#troubleshooting)).
+- Nothing runs as root without you: the only privileged step inside a distro,
+  repairing Windows interop, goes through its `sudo` after you agree (see
+  [Security](#security)).
 - Destructive actions ask first; unregistering requires typing the distro name.
 
 **Control and organize**
@@ -200,9 +201,10 @@ warns first, because doing it from here can break that tool. Set
 
 **`.exe` files stop working inside a distro ("Exec format error").**
 When a distro stops, WSL removes Windows interop from every other running
-distro. The extension restores it automatically after its own actions and when
-it notices a distro stopped. To restore it on demand, run **Repair Windows
-Interop** from the view's `...` menu. From inside the distro:
+distro. The extension notices and offers to repair it; you can also run
+**Repair Windows Interop** from the view's `...` menu. The repair uses the
+distro's `sudo`, asking for your password if the distro requires one. By hand,
+from inside the distro:
 
 ```bash
 sudo sh -c "echo :WSLInterop:M::MZ::/init:P > /proc/sys/fs/binfmt_misc/register"
@@ -224,6 +226,31 @@ Copy the `.vsix` to a Windows folder first.
 **The view shows an error.** Check that `wsl.exe --list` works in a terminal.
 If `wsl.exe` is not on the `PATH`, set `wslManager.wslExePath`. With no distro
 installed, the view offers *Install Distro* and *Import Distro* instead.
+
+## Security
+
+- **No root without your consent.** WSL lets your Windows account enter any
+  distro as root with no password (`wsl -u root`), bypassing the distro's
+  `sudo` rules. The extension never uses that. Its only privileged step inside
+  a distro, repairing Windows interop, asks first, shows the exact command, and
+  runs it through the distro's `sudo`, so the distro decides who may do it and
+  whether a password is needed. A password you type goes to `sudo` on standard
+  input only; it is never stored or logged.
+- **Administrator rights only through UAC.** Compacting a disk runs `diskpart`,
+  which Windows allows only after its UAC prompt. The `diskpart` commands are
+  passed inside the elevated process's own command line, not through a file
+  another program could change before it runs.
+- **Your files, as your user.** Details, live metrics, backups, and sending
+  files run as the distro's default user. Folders that would need `sudo` are
+  refused, not escalated.
+- **No distro system files are edited.** Files such as `/etc/wsl.conf` are left
+  to `sudo` inside the distro. The only configuration file the extension writes
+  is your Windows `%USERPROFILE%\.wslconfig`.
+- **No shell injection.** Commands are started with explicit argument lists;
+  names and paths are passed as arguments, never pasted into a shell script.
+
+Report security issues privately through GitHub's
+[security advisories](https://github.com/edtroleis/vscode-wsl-distro-manager/security/advisories/new).
 
 ## Privacy
 
