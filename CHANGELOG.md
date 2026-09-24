@@ -22,6 +22,25 @@ project follows [Semantic Versioning](https://semver.org/).
 
 - `.wslconfig` is no longer listed under every distro.
 
+### Fixed
+
+- With no distro installed, the view showed "Failed to query wsl.exe" instead
+  of the *Install Distro* and *Import Distro* actions.
+- The CPU and memory tooltips closed within a second or two, because each
+  sample redraws the row. The WSL VM totals now appear in the row itself.
+- The distro tooltip showed *Running*/*Stopped* and *yes*/*no* in English in
+  other languages.
+- With `wslManager.showManagedDistros` off and only Docker/Podman distros
+  installed, the view claimed there were no distros; it now says they are
+  hidden.
+- Compaction could fail on a VHDX path with accented characters; it now passes
+  `diskpart` the short (8.3) path.
+- *Restart WSL* run from inside WSL would stop the extension before it started
+  the distros again; it now asks to run it from a local window.
+- *Start* ignored `wslManager.wslExePath` for the session that keeps the distro
+  running.
+- *Copy Name* gave no feedback; it now confirms in the status bar.
+
 ### Removed
 
 - Editing a distro's `/etc/wsl.conf`. WSL lets your Windows account enter any

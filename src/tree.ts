@@ -69,9 +69,10 @@ export class DistroItem extends vscode.TreeItem {
 
 		const tooltip = new vscode.MarkdownString();
 		tooltip.appendMarkdown(`**${distro.name}**\n\n`);
-		tooltip.appendMarkdown(vscode.l10n.t('- State: {0}\n', distro.running ? 'Running' : 'Stopped'));
+		const state = distro.running ? vscode.l10n.t('Running') : vscode.l10n.t('Stopped');
+		tooltip.appendMarkdown(vscode.l10n.t('- State: {0}\n', state));
 		tooltip.appendMarkdown(vscode.l10n.t('- Version: WSL {0}\n', distro.version));
-		tooltip.appendMarkdown(vscode.l10n.t('- Default: {0}\n', distro.isDefault ? 'yes' : 'no'));
+		tooltip.appendMarkdown(vscode.l10n.t('- Default: {0}\n', distro.isDefault ? vscode.l10n.t('yes') : vscode.l10n.t('no')));
 		if (managed) {
 			tooltip.appendMarkdown(vscode.l10n.t('\nManaged by **{0}**. {1}\n', managed.tool, managed.hint));
 		}
@@ -282,8 +283,18 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 			const items = distros
 				.filter((d) => showManaged || !managedBy(d.name))
 				.map((d) => new DistroItem(d, this.expanded.has(d.name)));
-			// With no distros, show nothing so the welcome view (Install / Import) appears.
-			return items.length > 0 ? [new GlobalItem(!this.collapsedGlobal), ...items] : [];
+			// With no distros at all, show nothing so the welcome view (Install / Import) appears.
+			if (distros.length === 0) {
+				return [];
+			}
+			const hidden = distros.length - items.length;
+			return [
+				new GlobalItem(!this.collapsedGlobal),
+				...items,
+				...(items.length === 0
+					? [new MessageItem(vscode.l10n.t('{0} Docker, Podman, or Rancher distros are hidden (wslManager.showManagedDistros).', hidden), 'eye-closed')]
+					: []),
+			];
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			return [new MessageItem(vscode.l10n.t('Failed to query wsl.exe: {0}', message), 'error')];

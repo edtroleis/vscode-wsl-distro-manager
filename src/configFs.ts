@@ -6,7 +6,7 @@ import { windowsHomeDir } from './wsl';
 export const SCHEME = 'wsl-config';
 
 const WSLCONFIG_TEMPLATE = `# .wslconfig - global settings for the WSL 2 VM (applies to every distro).
-# Applied after "wsl --shutdown".
+# Applied when WSL restarts (every distro stops); Windows does not need to restart.
 # Docs: https://learn.microsoft.com/windows/wsl/wsl-config
 
 [wsl2]

@@ -47,6 +47,10 @@ when the extension runs on Windows; `toWindowsPath()` converts those too.
 followed by a NUL. `decode()` checks for a BOM and then for the interleaved NUL
 pattern.
 
+**No distro installed.** `wsl --list --quiet` then exits with an error and a
+localized message, which must not be read as distro names: a non-zero exit
+means an empty list, and the view shows its welcome actions.
+
 **Localized columns.** `wsl --list --verbose` translates the STATE column to
 the Windows display language, and translations may contain spaces
 ("Em execução"), so slicing by column breaks. Names come from `--list --quiet`
@@ -109,7 +113,9 @@ nothing.
 **Compaction** runs `diskpart` (`attach vdisk readonly`, `compact vdisk`)
 elevated through `Start-Process -Verb RunAs`. An elevated process cannot pipe
 its output back, so `cmd.exe` redirects it to a log file that is read
-afterwards.
+afterwards. `diskpart` reads its script in the legacy code page, so a VHDX path
+with accents (for example under `C:\Users\joão`) is replaced by its 8.3 short
+form, which is plain ASCII; a drive without short names gets a clear error.
 
 **Reclaimable space** is the VHDX size minus the space used inside the distro
 (`df`). The VHDX always holds some file system overhead, so the estimate is
@@ -132,6 +138,10 @@ On WSL 2 all distros share one VM, but each has its own PID namespace. Summing
 `/proc/stat` and `/proc/meminfo` give the VM totals. One long-running `sh`
 loop per distro prints a sample per interval, so `wsl.exe` is not spawned on
 every tick.
+
+The rows show the distro's figures next to the VM totals, in the row itself
+rather than in a tooltip: each sample redraws the row, and VS Code closes a
+tooltip when its row is redrawn, so a tooltip would vanish within seconds.
 
 That loop is shared by every VS Code window. The first window to expand a
 distro takes a lock file in `%TEMP%\wsl-distro-manager` and writes each sample

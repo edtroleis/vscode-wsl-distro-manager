@@ -6,7 +6,7 @@ import { Distro } from './wsl';
 import { formatBytes } from './monitor';
 import { formatElapsed, withFileProgress, withProgress } from './progress';
 import { promptText } from './prompts';
-import { clearPending } from './pending';
+import { clearPending, pendingSince } from './pending';
 import { registerTransferCommands } from './transfer';
 import { DistroItem, DistroTreeProvider, InfoItem, estimateReclaimable } from './tree';
 import { globalUri } from './configFs';
@@ -275,9 +275,6 @@ async function startAgain(names: string[]): Promise<void> {
 		}
 	});
 }
-
-
-
 
 export function registerCommands(
 	context: vscode.ExtensionContext,
@@ -566,6 +563,13 @@ export function registerCommands(
 	});
 
 	register('wslManager.restartWsl', async () => {
+		// The shutdown would stop this extension before it starts the distros again.
+		if (process.platform !== 'win32') {
+			vscode.window.showWarningMessage(
+				vscode.l10n.t('This extension runs inside WSL, so restarting WSL would stop it before it could start the distros again. Run Restart WSL from a local VS Code window (not connected to WSL).'),
+			);
+			return;
+		}
 		const distros = await wsl.list();
 		const running = distros.filter((d) => d.running).map((d) => d.name);
 		const toStart = wsl.distrosToStartAgain(distros);
@@ -585,7 +589,7 @@ export function registerCommands(
 		].filter(Boolean);
 		const label = vscode.l10n.t('Restart WSL');
 		const choice = await vscode.window.showWarningMessage(
-			vscode.l10n.t('Restart WSL to apply .wslconfig?'),
+			pendingSince() !== undefined ? vscode.l10n.t('Restart WSL to apply .wslconfig?') : vscode.l10n.t('Restart WSL?'),
 			{ modal: true, detail: detail.join('\n\n') },
 			label,
 		);
@@ -603,8 +607,8 @@ export function registerCommands(
 		tree.refresh();
 		vscode.window.showInformationMessage(
 			toStart.length > 0
-				? vscode.l10n.t('WSL restarted with the new .wslconfig; {0} started again.', toStart.join(', '))
-				: vscode.l10n.t('WSL restarted; the new .wslconfig applies from the next distro you start.'),
+				? vscode.l10n.t('WSL restarted; {0} started again.', toStart.join(', '))
+				: vscode.l10n.t('WSL restarted; no distro was running, so none was started.'),
 		);
 	});
 
@@ -912,6 +916,7 @@ export function registerCommands(
 			return;
 		}
 		await vscode.env.clipboard.writeText(distro.name);
+		vscode.window.setStatusBarMessage(vscode.l10n.t('$(check) Copied "{0}"', distro.name), 3000);
 	});
 
 	registerTransferCommands(register, resolveDistro);

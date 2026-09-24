@@ -4,6 +4,8 @@ import {
 	currentWindowDistro,
 	decode,
 	interopBroken,
+	isAscii,
+	list,
 	isCurrentWindowDistro,
 	isInsideDistro,
 	linuxToWindowsPath,
@@ -429,5 +431,27 @@ describe('run cancellation', { skip: process.platform === 'win32' }, () => {
 		const controller = new AbortController();
 		controller.abort();
 		await assert.rejects(run(['10'], { signal: controller.signal }), CancelledError);
+	});
+});
+
+describe('isAscii', () => {
+	it('accepts plain Windows paths and rejects accented ones (which diskpart cannot read)', () => {
+		assert.equal(isAscii('E:\\wsl\\fedora-linux-43\\ext4.vhdx'), true);
+		assert.equal(isAscii('C:\\Users\\joão\\AppData\\Local\\wsl\\ext4.vhdx'), false);
+		assert.equal(isAscii('C:\\Users\\edtro\\OneDrive\\READET~1'), true);
+	});
+});
+
+describe('list with no distro installed', { skip: process.platform === 'win32' }, () => {
+	afterEach(() => {
+		delete settings['wslExePath'];
+	});
+
+	it('returns an empty list instead of failing, so the welcome view shows', async () => {
+		// wsl.exe with no distros: a localized message and a non-zero exit code.
+		const fake = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wsl-')), 'wsl');
+		fs.writeFileSync(fake, '#!/bin/sh\necho "O Subsistema do Windows para Linux nao tem distribuicoes instaladas."\nexit 1\n', { mode: 0o755 });
+		settings['wslExePath'] = fake;
+		assert.deepEqual(await list(), []);
 	});
 });

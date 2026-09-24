@@ -222,7 +222,11 @@ function lines(raw: string): string[] {
  * is always the version.
  */
 export async function list(): Promise<Distro[]> {
-	const quiet = (await run(['--list', '--quiet'])).stdout;
+	// With no distro installed, wsl.exe exits non-zero with a localized message
+	// ("... has no installed distributions"), which must not be read as names.
+	// A missing wsl.exe still throws (the process cannot start).
+	const quietResult = await run(['--list', '--quiet'], { tolerateFailure: true });
+	const quiet = quietResult.code === 0 ? quietResult.stdout : '';
 	if (lines(quiet).length === 0) {
 		return [];
 	}
@@ -282,12 +286,13 @@ export const unregister = (name: string) => run(['--unregister', name]);
  */
 export async function start(name: string): Promise<void> {
 	await run(['--distribution', name, '--exec', '/bin/true']);
-	const args = ['--distribution', name, '--exec', '/bin/sleep', '2147483647']
-		.map((a) => `'${a.replace(/'/g, "''")}'`)
-		.join(',');
+	const quote = (a: string) => `'${a.replace(/'/g, "''")}'`;
+	const args = ['--distribution', name, '--exec', '/bin/sleep', '2147483647'].map(quote).join(',');
+	// PowerShell runs on Windows: a configured wslExePath only applies there as-is.
+	const exe = process.platform === 'win32' ? wslExePath() : 'wsl.exe';
 	await spawnCapture(
 		powershellPath(),
-		['-NoProfile', '-NonInteractive', '-Command', `Start-Process -FilePath wsl.exe -WindowStyle Hidden -ArgumentList ${args}`],
+		['-NoProfile', '-NonInteractive', '-Command', `Start-Process -FilePath ${quote(exe)} -WindowStyle Hidden -ArgumentList ${args}`],
 		{ cwd: process.platform === 'win32' ? undefined : '/mnt/c' },
 	);
 }
@@ -535,6 +540,7 @@ export interface CompactResult {
  * redirects diskpart's output to a log file that we read afterwards.
  */
 export async function compactVhd(vhdWindowsPath: string): Promise<CompactResult> {
+	const vhd = await asciiPath(vhdWindowsPath);
 	const tempHost = await windowsTempDir();
 	const tempWindows = await toWindowsHostPath(tempHost);
 	const id = `wsl-distro-manager-${process.pid}-${Date.now()}`;
@@ -542,7 +548,7 @@ export async function compactVhd(vhdWindowsPath: string): Promise<CompactResult>
 	const logName = `${id}.log`;
 
 	const script = [
-		`select vdisk file="${vhdWindowsPath}"`,
+		`select vdisk file="${vhd}"`,
 		'attach vdisk readonly',
 		'compact vdisk',
 		'detach vdisk',
@@ -576,6 +582,34 @@ export async function compactVhd(vhdWindowsPath: string): Promise<CompactResult>
 		await fs.rm(scriptHost, { force: true });
 		await fs.rm(logHost, { force: true });
 	}
+}
+
+/**
+ * diskpart reads its script in the legacy code page, so an accented path (for
+ * example under C:\Users\joão) would reach it garbled. Such paths are replaced
+ * by their 8.3 short form (C:\Users\JOO~1\...), which is plain ASCII.
+ */
+async function asciiPath(windowsPath: string): Promise<string> {
+	if (isAscii(windowsPath)) {
+		return windowsPath;
+	}
+	const quoted = windowsPath.replace(/'/g, "''");
+	const result = await spawnCapture(
+		powershellPath(),
+		['-NoProfile', '-NonInteractive', '-Command', `(New-Object -ComObject Scripting.FileSystemObject).GetFile('${quoted}').ShortPath`],
+		{ cwd: process.platform === 'win32' ? undefined : '/mnt/c', tolerateFailure: true },
+	);
+	const short = result.stdout.trim();
+	if (result.code !== 0 || !short || !isAscii(short)) {
+		throw new Error(
+			vscode.l10n.t('diskpart cannot open {0}: the path has non-ASCII characters and the drive has no short (8.3) names. Move the distro to a folder with a plain name first.', windowsPath),
+		);
+	}
+	return short;
+}
+
+export function isAscii(text: string): boolean {
+	return /^[\x00-\x7f]*$/.test(text);
 }
 
 function powershellPath(): string {

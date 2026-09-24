@@ -43,7 +43,7 @@ Then run **Developer: Reload Window**.
 ### View and details
 - [ ] The **WSL Distro Manager** icon appears in the activity bar, and the view lists every distro.
 - [ ] Expanding a stopped distro shows its details without starting it; it stays **Stopped**.
-- [ ] Expanding a running distro shows CPU, memory, and processes, updating every 2 seconds.
+- [ ] Expanding a running distro shows CPU, memory, and processes, updating every 2 seconds, with the VM totals in the same rows (for example `2.8 GB · VM 5.3 GB of 24.5 GB`).
 - [ ] Collapsing it, or hiding the view, stops the updates; the rows show **paused**.
 - [ ] With two VS Code windows showing the same expanded distro, both update, and only one sampling `wsl.exe` runs.
 - [ ] The **VHDX** row of a running distro shows reclaimable space only when the gap is at least 2 GB and 10% of the used space.
@@ -57,12 +57,13 @@ Then run **Developer: Reload Window**.
 ### Distros managed by other tools
 - [ ] Podman and Docker distros show the tool's name, and their context menu has no *Set as Default*, *Convert*, *Compact Disk*, *Move*, *Back Up Folders*, or *Send Files*.
 - [ ] *Stop* on one of them warns that the tool manages it.
-- [ ] `wslManager.showManagedDistros: false` hides them; `true` shows them again.
+- [ ] `wslManager.showManagedDistros: false` hides them; `true` shows them again. With only managed distros installed and the setting off, the view says they are hidden.
 
 ### Configuration files
 - [ ] The **WSL** node is first in the view and expanded; it shows *Settings (.wslconfig)* with a summary of the file (or *WSL defaults*) and *Version* with the WSL and kernel versions. Distros list no configuration files, and no menu offers to edit `/etc/wsl.conf`.
 - [ ] Clicking *Settings (.wslconfig)* opens `%USERPROFILE%\.wslconfig`; saving updates the summary and says the change applies after WSL (not Windows) restarts, with **Restart WSL Now**.
 - [ ] After saving without restarting, the row shows *restart WSL to apply* with a warning icon and an inline restart button, also after reloading the window.
+- [ ] **Restart WSL** from a window connected to WSL (with the extension running there) refuses and explains why.
 - [ ] **Restart WSL** lists the running distros, stops WSL, and starts again only those that were running (not Podman/Docker ones); stopped distros stay stopped, and the pending mark disappears.
 - [ ] Collapsing the **WSL** node keeps it collapsed across refreshes.
 

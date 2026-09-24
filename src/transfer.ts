@@ -153,9 +153,10 @@ export function registerTransferCommands(register: Register, resolveDistro: Reso
 		if (!distro) {
 			return;
 		}
+		const desktop = await wsl.windowsDesktopDir().then(wsl.toHostPath).catch(() => undefined);
 		const files = await vscode.window.showOpenDialog({
 			title: vscode.l10n.t('Files to send to {0}', distro.name),
-			defaultUri: vscode.Uri.file(await wsl.toHostPath(await wsl.windowsDesktopDir()).catch(() => '')),
+			defaultUri: desktop ? vscode.Uri.file(desktop) : undefined,
 			canSelectMany: true,
 			canSelectFiles: true,
 			canSelectFolders: false,

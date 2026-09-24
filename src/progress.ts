@@ -17,7 +17,7 @@ export function formatElapsed(ms: number): string {
 
 /**
  * Cancellable progress for a wsl.exe operation that writes one growing file
- * (export, import, move). Resolves to undefined when the user cancels.
+ * (export, import, move, backup). Resolves to undefined when the user cancels.
  */
 export async function withFileProgress<T>(
 	title: string,

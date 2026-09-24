@@ -23,8 +23,8 @@ themselves.
 ## Features
 
 **Watch every distro**
-- Live CPU, memory, and process count for running distros, shared by every
-  VS Code window.
+- Live CPU, memory, and process count for running distros, next to the totals
+  of the WSL VM, shared by every VS Code window.
 - State, WSL version, and default distro, refreshed automatically.
 - Expand a distro for its OS, kernel, default user, disk usage, install
   location, and virtual disk (VHDX) size.
@@ -221,8 +221,9 @@ Run **Developer: Reload Window** in that window.
 is not allowed".** VS Code on Windows does not open files inside a distro.
 Copy the `.vsix` to a Windows folder first.
 
-**The view is empty or shows an error.** Check that `wsl.exe --list` works in a
-terminal. If `wsl.exe` is not on the `PATH`, set `wslManager.wslExePath`.
+**The view shows an error.** Check that `wsl.exe --list` works in a terminal.
+If `wsl.exe` is not on the `PATH`, set `wslManager.wslExePath`. With no distro
+installed, the view offers *Install Distro* and *Import Distro* instead.
 
 ## Privacy
 
