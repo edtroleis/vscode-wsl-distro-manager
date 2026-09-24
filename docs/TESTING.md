@@ -61,8 +61,8 @@ Then run **Developer: Reload Window**.
 - [ ] `wslManager.showManagedDistros: false` hides them; `true` shows them again. With only managed distros installed and the setting off, the view says they are hidden.
 
 ### Configuration files
-- [ ] The **WSL** node is first in the view and expanded; it shows *.wslconfig*, with the file's values (or *WSL defaults*) in its tooltip and nothing after the name, and *Version* with the WSL and kernel versions. Distros list no configuration files, and no menu offers to edit `/etc/wsl.conf`.
-- [ ] Clicking *.wslconfig* opens `%USERPROFILE%\.wslconfig`; saving updates the tooltip and says the change applies after WSL (not Windows) restarts, with **Restart WSL Now**.
+- [ ] The **WSL** node is first in the view and expanded; it shows *.wslconfig* with nothing from inside the file (not in the row, not in the tooltip), and *Version* with the WSL and kernel versions. Distros list no configuration files, and no menu offers to edit `/etc/wsl.conf`.
+- [ ] Clicking *.wslconfig* opens `%USERPROFILE%\.wslconfig`; saving says the change applies after WSL (not Windows) restarts, with **Restart WSL Now**.
 - [ ] After saving without restarting, the row shows *restart WSL to apply* with a warning icon and an inline restart button, also after reloading the window.
 - [ ] **Restart WSL** from a window connected to WSL (with the extension running there) refuses and explains why.
 - [ ] **Restart WSL** lists the running distros, stops WSL, and starts again only those that were running (not Podman/Docker ones); stopped distros stay stopped, and the pending mark disappears.

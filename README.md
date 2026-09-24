@@ -79,8 +79,9 @@ themselves.
 - Set the default distro, restart WSL, or shut it down. *Restart WSL* starts
   again only the distros that were running.
 - Edit the global `.wslconfig` from its row under the **WSL** node, at the top
-  of the view; hover it to see the main settings. The node also shows the WSL
-  and kernel versions. See [Configure WSL](#configure-wsl-wslconfig).
+  of the view. The view shows nothing from inside the file; click the row to
+  open it. The node also shows the WSL and kernel versions. See
+  [Configure WSL](#configure-wsl-wslconfig).
 
 Every action is one right-click away:
 

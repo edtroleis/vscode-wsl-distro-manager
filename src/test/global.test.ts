@@ -1,7 +1,7 @@
 import assert = require('node:assert/strict');
 import { describe, it } from 'node:test';
 import { GlobalItem, wslConfigItem, wslVersionItem } from '../tree';
-import { decode, distrosToStartAgain, parseUptime, parseWslConfig, parseWslVersion, summarizeWslConfig } from '../wsl';
+import { decode, distrosToStartAgain, parseUptime, parseWslVersion } from '../wsl';
 import { restartedSince } from '../pending';
 
 describe('parseWslVersion', () => {
@@ -25,35 +25,6 @@ describe('parseWslVersion', () => {
 	});
 });
 
-describe('parseWslConfig', () => {
-	it('reads sections and keys, ignoring comments, even after a value', () => {
-		const config = parseWslConfig(
-			'# global settings\n[wsl2]\nmemory=25GB   # Limits VM memory\nprocessors=8  ; two cores\n\n[Experimental]\nsparseVhd = true\n',
-		);
-		assert.deepEqual(config, { wsl2: { memory: '25GB', processors: '8' }, experimental: { sparsevhd: 'true' } });
-	});
-
-	it('lowercases names, unquotes values, and keeps "=" inside values', () => {
-		assert.deepEqual(parseWslConfig('[WSL2]\nKernelCommandLine = "a=b c"\n'), { wsl2: { kernelcommandline: 'a=b c' } });
-	});
-
-	it('returns an empty config for an empty or commented-out file', () => {
-		assert.deepEqual(parseWslConfig('# [wsl2]\n# memory=8GB\n'), {});
-	});
-});
-
-describe('summarizeWslConfig', () => {
-	it('lists the notable keys in a fixed order, with their usual spelling', () => {
-		const config = parseWslConfig('[experimental]\nautoMemoryReclaim=gradual\n[wsl2]\nprocessors=8\nmemory=25GB\nnetworkingMode=mirrored\n');
-		assert.equal(summarizeWslConfig(config), 'memory=25GB · processors=8 · networkingMode=mirrored · autoMemoryReclaim=gradual');
-	});
-
-	it('returns undefined when nothing notable is set', () => {
-		assert.equal(summarizeWslConfig(parseWslConfig('[wsl2]\nguiApplications=false\n')), undefined);
-		assert.equal(summarizeWslConfig({}), undefined);
-	});
-});
-
 describe('WSL node', () => {
 	it('is expanded unless the user collapsed it, with a stable id', () => {
 		assert.equal(new GlobalItem(true).collapsibleState, 2);
@@ -61,17 +32,16 @@ describe('WSL node', () => {
 		assert.equal(new GlobalItem(true).id, 'global');
 	});
 
-	it('is named after the file, keeps the values in the tooltip, and opens the file on click', () => {
-		const item = wslConfigItem('memory=25GB · processors=8', true, 'C:\\Users\\u\\.wslconfig');
+	it('is named after the file, shows nothing from inside it, and opens it on click', () => {
+		const item = wslConfigItem(true, 'C:\\Users\\u\\.wslconfig');
 		assert.equal(item.label, '.wslconfig');
 		assert.equal(item.description, undefined);
-		assert.match(String(item.tooltip), /memory=25GB · processors=8/);
+		assert.doesNotMatch(String(item.tooltip), /=/);
 		assert.equal(item.command?.command, 'wslManager.editWslConfig');
 	});
 
-	it('says when .wslconfig does not exist or sets nothing', () => {
-		assert.equal(wslConfigItem(undefined, false, 'x').description, 'not created');
-		assert.match(String(wslConfigItem(undefined, true, 'x').tooltip), /WSL defaults/);
+	it('says when .wslconfig does not exist', () => {
+		assert.equal(wslConfigItem(false, 'x').description, 'not created');
 	});
 
 	it('shows the WSL and kernel versions, or how to get them', () => {
@@ -82,14 +52,14 @@ describe('WSL node', () => {
 
 describe('pending .wslconfig changes', () => {
 	it('flags the row, says WSL (not Windows) must restart, and offers the restart inline', () => {
-		const item = wslConfigItem('memory=25GB', true, 'C:\\Users\\u\\.wslconfig', true);
+		const item = wslConfigItem(true, 'C:\\Users\\u\\.wslconfig', true);
 		assert.equal(item.description, 'restart WSL to apply');
 		assert.equal(item.contextValue, 'wslGlobalConfig.pending');
 		assert.match(String(item.tooltip), /restart WSL \(not Windows\)/);
 	});
 
 	it('is a plain settings row when nothing is pending', () => {
-		const item = wslConfigItem('memory=25GB', true, 'x');
+		const item = wslConfigItem(true, 'x');
 		assert.equal(item.contextValue, 'wslGlobalConfig');
 		assert.match(String(item.tooltip), /Windows does not need to restart/);
 	});

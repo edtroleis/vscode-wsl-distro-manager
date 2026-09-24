@@ -30,8 +30,6 @@
   "VHDX": "VHDX",
   "all distros": "todas as distros",
   "Settings and versions that apply to WSL as a whole": "Configurações e versões que valem para o WSL como um todo",
-  "WSL defaults": "padrões do WSL",
-  "not created; WSL defaults": "não criado; padrões do WSL",
   "Saved changes are not applied yet: restart WSL (not Windows) to apply them.": "As mudanças salvas ainda não valem: reinicie o WSL (não o Windows) para aplicá-las.",
   "Changes apply to every distro after WSL restarts. Windows does not need to restart.": "As mudanças valem para todas as distros depois que o WSL reinicia. Não é preciso reiniciar o Windows.",
   "Edit {0}": "Editar {0}",

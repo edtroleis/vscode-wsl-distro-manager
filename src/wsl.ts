@@ -905,58 +905,14 @@ export function wslVersion(refresh = false): Promise<WslVersion | undefined> {
 	return cachedWslVersion;
 }
 
-export type WslConfig = Record<string, Record<string, string>>;
-
 /**
- * Minimal INI reader for .wslconfig: [sections], key=value, and comments
- * starting with # or ; (whole-line or after a value, which people do write:
- * "memory=8GB  # limit"). Section and key names are lowercased.
+ * Where the global .wslconfig is and whether it exists. Its contents are never
+ * read here: the view only opens the file.
  */
-export function parseWslConfig(text: string): WslConfig {
-	const config: WslConfig = {};
-	let section = '';
-	for (const raw of text.split(/\r?\n/)) {
-		const line = raw.replace(/\s[#;].*$/, '').replace(/^\s*[#;].*$/, '').trim();
-		if (!line) {
-			continue;
-		}
-		const header = /^\[([^\]]+)\]$/.exec(line);
-		if (header) {
-			section = header[1].trim().toLowerCase();
-			continue;
-		}
-		const pair = /^([^=]+)=(.*)$/.exec(line);
-		if (pair) {
-			(config[section] ??= {})[pair[1].trim().toLowerCase()] = pair[2].trim().replace(/^"(.*)"$/, '$1');
-		}
-	}
-	return config;
-}
-
-/** The .wslconfig keys worth showing at a glance, in this order. */
-const WSLCONFIG_SUMMARY_KEYS: [section: string, key: string, label: string][] = [
-	['wsl2', 'memory', 'memory'],
-	['wsl2', 'processors', 'processors'],
-	['wsl2', 'swap', 'swap'],
-	['wsl2', 'networkingmode', 'networkingMode'],
-	['wsl2', 'vmidletimeout', 'vmIdleTimeout'],
-	['experimental', 'automemoryreclaim', 'autoMemoryReclaim'],
-	['experimental', 'sparsevhd', 'sparseVhd'],
-];
-
-/** "memory=25GB · processors=8", or undefined when nothing notable is set. */
-export function summarizeWslConfig(config: WslConfig): string | undefined {
-	const parts = WSLCONFIG_SUMMARY_KEYS.filter(([section, key]) => config[section]?.[key] !== undefined).map(
-		([section, key, label]) => `${label}=${config[section][key]}`,
-	);
-	return parts.length > 0 ? parts.join(' · ') : undefined;
-}
-
-/** The global .wslconfig, parsed; an empty config when the file does not exist. */
-export async function readWslConfig(): Promise<{ path: string; config: WslConfig; exists: boolean }> {
+export async function wslConfigFile(): Promise<{ path: string; exists: boolean }> {
 	const file = path.join(await windowsHomeDir(), '.wslconfig');
-	const text = await fs.readFile(file, 'utf8').catch(() => undefined);
-	return { path: file, config: text === undefined ? {} : parseWslConfig(text), exists: text !== undefined };
+	const exists = await fs.access(file).then(() => true, () => false);
+	return { path: file, exists };
 }
 
 /** Seconds since the WSL VM booted, read in a running distro (from /proc/uptime). */

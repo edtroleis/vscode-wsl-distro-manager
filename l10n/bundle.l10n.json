@@ -32,8 +32,6 @@
   "Settings and versions that apply to WSL as a whole": "Settings and versions that apply to WSL as a whole",
   "restart WSL to apply": "restart WSL to apply",
   "not created": "not created",
-  "WSL defaults": "WSL defaults",
-  "not created; WSL defaults": "not created; WSL defaults",
   "Saved changes are not applied yet: restart WSL (not Windows) to apply them.": "Saved changes are not applied yet: restart WSL (not Windows) to apply them.",
   "Changes apply to every distro after WSL restarts. Windows does not need to restart.": "Changes apply to every distro after WSL restarts. Windows does not need to restart.",
   "Edit {0}": "Edit {0}",

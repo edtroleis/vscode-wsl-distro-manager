@@ -12,6 +12,9 @@ project follows [Semantic Versioning](https://semver.org/).
 
 - New icon and a mascot: a penguin in a suit with a clipboard, who keeps your
   distros in order. The activity bar shows it as an outline.
+- The *.wslconfig* row no longer shows anything from inside the file, not
+  even in its tooltip; click it to open the file. The extension no longer
+  reads the file's contents at all.
 
 ## [0.0.4] - 2026-09-24
 

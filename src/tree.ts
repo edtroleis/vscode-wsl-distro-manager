@@ -7,12 +7,11 @@ import {
 	isCurrentWindowDistro,
 	list,
 	managedBy,
-	readWslConfig,
 	registryInfo,
 	runtimeInfo,
-	summarizeWslConfig,
 	toHostPath,
 	vmUptime,
+	wslConfigFile,
 	wslVersion,
 } from './wsl';
 import { clearPending, pendingSince, restartedSince } from './pending';
@@ -179,18 +178,16 @@ export class GlobalItem extends vscode.TreeItem {
 }
 
 /**
- * The .wslconfig row; a click opens the file and the tooltip lists what is set.
+ * The .wslconfig row. It shows nothing from inside the file; a click opens it.
  * While a saved change waits for WSL to restart, the row says so and offers the
  * restart inline.
  */
 export function wslConfigItem(
-	summary: string | undefined,
 	exists: boolean,
 	file: string,
 	pending = false,
 ): vscode.TreeItem {
-	// The file name says what it is; the row stays short, with the values in
-	// the tooltip and only a state that needs attention in the description.
+	// Only a state that needs attention goes next to the name.
 	const item = new vscode.TreeItem('.wslconfig', vscode.TreeItemCollapsibleState.None);
 	item.id = 'global/wslconfig';
 	item.description = pending
@@ -200,7 +197,6 @@ export function wslConfigItem(
 			: vscode.l10n.t('not created');
 	item.tooltip = [
 		file,
-		summary ?? (exists ? vscode.l10n.t('WSL defaults') : vscode.l10n.t('not created; WSL defaults')),
 		'',
 		pending
 			? vscode.l10n.t('Saved changes are not applied yet: restart WSL (not Windows) to apply them.')
@@ -282,13 +278,12 @@ export class DistroTreeProvider implements vscode.TreeDataProvider<vscode.TreeIt
 		}
 		if (element instanceof GlobalItem) {
 			const [config, version, pending] = await Promise.all([
-				readWslConfig().catch(() => undefined),
+				wslConfigFile().catch(() => undefined),
 				wslVersion(),
 				this.stillPending(),
 			]);
 			return [
 				wslConfigItem(
-					config && summarizeWslConfig(config.config),
 					config?.exists ?? false,
 					config?.path ?? '.wslconfig',
 					pending,
