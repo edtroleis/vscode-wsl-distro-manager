@@ -1,0 +1,69 @@
+name: Release
+
+# Every merge to main: test, then publish the version in package.json to the
+# Marketplace, tag it, and create a GitHub release. A version that is already
+# published is skipped, so re-runs and docs-only pushes are harmless.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: marketplace
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - id: status
+        run: bash scripts/marketplace-status.sh
+
+      - name: Already published
+        if: steps.status.outputs.published == 'true'
+        run: echo "::notice::Version ${{ steps.status.outputs.version }} is already on the Marketplace; nothing to publish."
+
+      - name: Package
+        if: steps.status.outputs.published == 'false'
+        run: npx vsce package --out "wsl-distro-manager-${{ steps.status.outputs.version }}.vsix"
+
+      - name: Publish to the Marketplace
+        if: steps.status.outputs.published == 'false'
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: npx vsce publish --packagePath "wsl-distro-manager-${{ steps.status.outputs.version }}.vsix"
+
+      - name: Tag and create the GitHub release
+        if: steps.status.outputs.published == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.status.outputs.version }}
+        run: |
+          # Release notes: the CHANGELOG section of this version.
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" { on = 1; next }
+            on && /^## \[/ { exit }
+            on && /^\[[^]]+\]: / { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "See CHANGELOG.md." > notes.md
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            gh release upload "v$VERSION" "wsl-distro-manager-$VERSION.vsix" --clobber
+          else
+            gh release create "v$VERSION" "wsl-distro-manager-$VERSION.vsix" \
+              --target "$GITHUB_SHA" --title "WSL Distro Manager $VERSION" --notes-file notes.md
+          fi

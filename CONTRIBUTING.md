@@ -81,13 +81,21 @@ translation is missing or has different placeholders, and CI fails if
 
 ## Pull requests
 
-1. Create a branch from `main`.
+1. Create a branch from `main`. Every push to it runs CI: the tests on Ubuntu
+   and Windows, the localization check, and packaging.
 2. Make the change, with tests when it touches parsing or logic.
 3. Run `npm test`, and `npm run smoke` if the change calls `wsl.exe`.
-4. Update `CHANGELOG.md` under **Unreleased**, and the README when behavior
-   visible to users changes.
-5. Open the pull request with a description of the problem and how you tested
-   the fix.
+4. **Raise the version** and describe the change in `CHANGELOG.md`: every merge
+   to `main` is published, so a pull request whose version is already on the
+   Marketplace fails CI.
+
+   ```bash
+   npm version patch --no-git-tag-version   # or minor / major
+   ```
+
+5. Update the README when behavior visible to users changes.
+6. Open the pull request with a description of the problem and how you tested
+   the fix. Merge it when CI passes.
 
 ## Icons
 
@@ -101,20 +109,32 @@ translation is missing or has different placeholders, and CI fails if
 
 ## Releases
 
-1. Move the **Unreleased** entries in `CHANGELOG.md` under the new version,
-   and update `version` in `package.json`.
-2. Build the package into a Windows folder. VS Code on Windows cannot install
-   a `.vsix` stored inside a distro.
+Releases are automatic. On every push to `main`, the **Release** workflow runs
+CI and then, if the version in `package.json` is not on the Marketplace yet,
+publishes it, tags it `v<version>`, and creates a GitHub release with the
+`.vsix` and that version's `CHANGELOG.md` section. A version that is already
+published is skipped.
+
+Before a release that changes the interface, go through
+[docs/TESTING.md](docs/TESTING.md) with a package built from the branch (CI
+uploads it as the `vsix` artifact of each run), and retake the screenshots in
+`images/`. The Marketplace loads them from GitHub.
+
+### Setup (once)
+
+1. Create a publisher `edtroleis` at
+   <https://marketplace.visualstudio.com/manage>.
+2. Create an Azure DevOps Personal Access Token with **Organization: All
+   accessible organizations** and the scope **Marketplace > Manage**.
+3. Store it as the `VSCE_PAT` secret of the repository:
 
    ```bash
-   npx vsce package --out /mnt/c/Users/<you>/Downloads/
+   gh secret set VSCE_PAT --repo edtroleis/vscode-wsl-distro-manager
    ```
 
-3. Install it in a local VS Code window (**Extensions: Install from VSIX...**)
-   and go through [docs/TESTING.md](docs/TESTING.md).
-4. Retake screenshots in `images/` if the interface changed. They are not
-   packaged: the Marketplace loads them from GitHub, so push them first.
-5. Commit, tag (`git tag v<version>`), and push with tags.
-6. Publish with `npx vsce publish` (publisher `edtroleis`; `npx vsce login
-   edtroleis` needs a Personal Access Token with the **Marketplace > Manage**
-   scope).
+4. Protect `main` so changes arrive through pull requests with CI passing
+   (Settings > Branches, or `gh api`), requiring the checks *Test
+   (ubuntu-latest)*, *Test (windows-latest)*, and *Version not yet published*.
+
+The token expires; when publishing fails with an authentication error, create a
+new one and run step 3 again.
