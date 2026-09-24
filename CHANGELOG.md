@@ -6,6 +6,13 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.0.5] - 2026-09-24
+
+### Changed
+
+- New icon and a mascot: a penguin in a suit with a clipboard, who keeps your
+  distros in order. The activity bar shows it as an outline.
+
 ## [0.0.4] - 2026-09-24
 
 ### Changed

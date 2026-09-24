@@ -1,12 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-  <g fill="none" stroke="#000" stroke-width="1.5">
-    <rect x="3.75" y="3.75" width="16.5" height="4.5" rx="1.25"/>
-    <rect x="3.75" y="9.75" width="16.5" height="4.5" rx="1.25"/>
-    <rect x="3.75" y="15.75" width="16.5" height="4.5" rx="1.25"/>
+  <!-- Activity bar icon: the mascot as a one-color outline. VS Code uses only
+       its shape and paints it in the theme color. -->
+  <defs>
+    <mask id="board">
+      <rect width="24" height="24" fill="#fff"/>
+      <rect x="12.5" y="10.9" width="9.5" height="12" rx="1.5" fill="#000"/>
+    </mask>
+  </defs>
+  <g mask="url(#board)">
+    <path d="M12 2.75C9.6 2.75 7.75 4.6 7.75 7c0 1.2.15 1.9-.55 3.2-1 1.8-1.45 3.4-1.45 5.05 0 3.55 2.75 6 6.25 6s6.25-2.45 6.25-6c0-1.65-.45-3.25-1.45-5.05-.7-1.3-.55-2-.55-3.2 0-2.4-1.85-4.25-4.25-4.25Z" fill="none" stroke="#000" stroke-width="1.5" stroke-linejoin="round"/>
+    <circle cx="10.4" cy="6.6" r="1.1" fill="#000"/>
+    <circle cx="13.6" cy="6.6" r="1.1" fill="#000"/>
+    <path d="M10.7 8.4h2.6L12 10Z" fill="#000"/>
   </g>
-  <g fill="#000">
-    <circle cx="6.75" cy="6" r="1"/>
-    <circle cx="6.75" cy="12" r="1"/>
-    <circle cx="6.75" cy="18" r="1"/>
-  </g>
+  <rect x="13.75" y="12.75" width="7" height="8.5" rx="1" fill="none" stroke="#000" stroke-width="1.5"/>
+  <rect x="15.6" y="11.6" width="3.3" height="2" rx="0.6" fill="#000"/>
+  <path d="M15.75 16.25h3M15.75 18.75h3" stroke="#000" stroke-width="1.2" stroke-linecap="round"/>
 </svg>

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="images/mascot.png" width="180" alt="The Distro Manager for WSL mascot: a penguin in a suit and green tie, holding a clipboard with a checklist.">
+</p>
+
 # Distro Manager for WSL
 
 [![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.85.0-007ACC?logo=visualstudiocode&logoColor=white)](https://code.visualstudio.com/)

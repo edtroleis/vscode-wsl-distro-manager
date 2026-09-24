@@ -106,13 +106,18 @@ and vulnerabilities as described in [SECURITY.md](SECURITY.md).
 
 ## Icons
 
+- `resources/mascot.svg` is the mascot: a penguin in a suit with a clipboard,
+  who keeps the distros in order. `resources/icon.svg` places the same drawing on
+  the brand blue; keep the two in sync.
 - `resources/icon.svg` is the source of the Marketplace icon, `resources/icon.png`
-  (256 × 256, transparent corners). After editing the SVG, render the PNG with a
-  headless browser, for example Edge:
+  (256 × 256, transparent corners), and `resources/mascot.svg` of
+  `images/mascot.png` (400 × 400, transparent), shown at the top of the README.
+  After editing an SVG, render the PNG with a headless browser, for example Edge:
   `msedge --headless=new --default-background-color=00000000 --window-size=256,256 --screenshot=icon.png icon.html`,
   where `icon.html` shows the SVG at 256 px on a transparent page.
 - `resources/wsl.svg` is the activity bar icon: a single-color outline of the
-  same drawing. VS Code only uses its shape and paints it in the theme color.
+  mascot with its clipboard, simple enough to read at 24 px. VS Code only uses
+  its shape and paints it in the theme color.
 
 ## Releases
 
