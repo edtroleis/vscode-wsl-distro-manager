@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Source of icon.png. A stack of distros, each with a status light
+       (two running, one stopped), like the extension's own list. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1a72d6"/>
+      <stop offset="1" stop-color="#0a3470"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="url(#bg)"/>
+  <rect x="22" y="80" width="84" height="22" rx="6" fill="#ffffff" opacity="0.55"/>
+  <rect x="22" y="53" width="84" height="22" rx="6" fill="#ffffff" opacity="0.8"/>
+  <rect x="22" y="26" width="84" height="22" rx="6" fill="#ffffff"/>
+  <circle cx="36" cy="37" r="5" fill="#2fcf78"/>
+  <circle cx="36" cy="64" r="5" fill="#2fcf78"/>
+  <circle cx="36" cy="91" r="5" fill="#7f93aa"/>
+  <rect x="48" y="34.5" width="44" height="5" rx="2.5" fill="#1a4f8f"/>
+  <rect x="48" y="61.5" width="34" height="5" rx="2.5" fill="#1a4f8f" opacity="0.8"/>
+  <rect x="48" y="88.5" width="40" height="5" rx="2.5" fill="#1a4f8f" opacity="0.6"/>
+</svg>
