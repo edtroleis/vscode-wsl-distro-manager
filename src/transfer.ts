@@ -91,6 +91,11 @@ export function isWithin(path: string, folder: string): boolean {
 	return folder === '.' || path === folder || path.startsWith(`${folder}/`);
 }
 
+/** Whether two lists hold the same keys, in any order. */
+export function sameKeys(a: string[], b: string[]): boolean {
+	return a.length === b.length && a.every((k) => b.includes(k));
+}
+
 /** Drops paths already covered by a selected folder above them. */
 export function normalizeSelection(paths: string[]): string[] {
 	const unique = [...new Set(paths)];
@@ -363,7 +368,10 @@ interface PathItem extends vscode.QuickPickItem {
  * ↑ button goes up. Choices in every folder are kept until OK. Typed paths
  * (relative or absolute) are asked for afterwards when "Type paths" is checked.
  */
-async function pickHomePaths(distro: Distro): Promise<{ paths: string[]; homeNames: string[] } | undefined> {
+export async function pickHomePaths(
+	distro: Distro,
+	listFolder: (distro: string, folder: string) => Promise<wsl.HomeEntry[]> = wsl.listFolder,
+): Promise<{ paths: string[]; homeNames: string[] } | undefined> {
 	const TYPED = '\0typed';
 	const openButton: vscode.QuickInputButton = {
 		iconPath: new vscode.ThemeIcon('arrow-right'),
@@ -378,36 +386,56 @@ async function pickHomePaths(distro: Distro): Promise<{ paths: string[]; homeNam
 	let homeNames: string[] = [];
 	let folder = '.';
 	let viewKeys: string[] = [];
-	let shownChecked: string[] = [];
-	let syncing = false;
+	// What the list shows as checked, as far as we know. VS Code reports
+	// selection changes asynchronously, including the ones this code makes, so
+	// an event matching it is an echo, not a click.
+	let uiChecked: string[] = [];
+	// Replacing the items (opening a folder) clears the checks and echoes that
+	// too; until then, the list is kept in line with the selection instead.
+	let settleUntil = 0;
 
 	const pick = vscode.window.createQuickPick<PathItem>();
 	pick.canSelectMany = true;
 	pick.ignoreFocusOut = true;
 	pick.matchOnDescription = false;
 
-	const render = (items: PathItem[]) => {
-		viewKeys = items.filter((i) => i.key !== TYPED).map((i) => i.key);
+	const inherited = () => selected.some((p) => p !== folder && isWithin(folder, p));
+
+	/** The checks this folder's view should show for the current selection. */
+	const desiredChecks = (): string[] => {
 		// A folder already taken whole through a folder above shows as such.
-		const inherited = selected.some((p) => p !== folder && isWithin(folder, p));
-		shownChecked = inherited ? [folder] : viewKeys.filter((k) => selected.includes(k));
+		const shown = inherited() ? [folder] : viewKeys.filter((k) => selected.includes(k));
+		return typed && folder === '.' ? [TYPED, ...shown] : shown;
+	};
+
+	const showChecks = (keys: string[]) => {
+		uiChecked = keys;
+		pick.selectedItems = pick.items.filter((i) => keys.includes(i.key));
+	};
+
+	const updateText = () => {
 		const count = selected.length + (typed ? 1 : 0);
 		pick.title = vscode.l10n.t('Back up from {0}: ~/{1}', distro.name, folder === '.' ? '' : folder);
-		pick.placeholder = inherited
+		pick.placeholder = inherited()
 			? vscode.l10n.t('Already included through a folder above. Go up and uncheck it to choose items here.')
 			: count > 0
 				? vscode.l10n.t('{0} selected. Check to include; ➔ opens a folder; OK when done.', count)
 				: vscode.l10n.t('Check to include; ➔ opens a folder to choose items inside; OK when done.');
+	};
+
+	/** Shows a folder's entries; only navigation replaces the items. */
+	const render = (items: PathItem[]) => {
+		viewKeys = items.filter((i) => i.key !== TYPED).map((i) => i.key);
 		pick.buttons = folder === '.' ? [] : [upButton];
-		syncing = true;
 		pick.items = items;
-		pick.selectedItems = items.filter((i) => (i.key === TYPED ? typed : shownChecked.includes(i.key)));
-		syncing = false;
+		updateText();
+		settleUntil = Date.now() + 500;
+		showChecks(desiredChecks());
 	};
 
 	const open = async (target: string) => {
 		pick.busy = true;
-		const entries = await wsl.listFolder(distro.name, target).catch(() => []);
+		const entries = await listFolder(distro.name, target).catch(() => []);
 		pick.busy = false;
 		folder = target;
 		if (target === '.') {
@@ -436,16 +464,27 @@ async function pickHomePaths(distro: Distro): Promise<{ paths: string[]; homeNam
 	const result = await new Promise<string[] | undefined>((resolve) => {
 		let done = false;
 		pick.onDidChangeSelection((items) => {
-			if (syncing) {
+			const keys = items.map((i) => i.key);
+			if (sameKeys(keys, uiChecked)) {
 				return;
 			}
-			typed = items.some((i) => i.key === TYPED);
-			const nowChecked = items.map((i) => i.key).filter((k) => k !== TYPED);
-			const inherited = selected.some((p) => p !== folder && isWithin(folder, p));
-			if (!inherited) {
-				selected = updateSelection(selected, folder, viewKeys, shownChecked, nowChecked);
+			if (Date.now() < settleUntil) {
+				showChecks(desiredChecks());
+				return;
 			}
-			render([...pick.items]);
+			const before = uiChecked.filter((k) => k !== TYPED);
+			const now = keys.filter((k) => k !== TYPED);
+			typed = keys.includes(TYPED);
+			if (!inherited()) {
+				selected = updateSelection(selected, folder, viewKeys, before, now);
+			}
+			uiChecked = keys;
+			updateText();
+			// Apply the rules ("Everything" vs. items) and undo clicks that cannot count.
+			const desired = desiredChecks();
+			if (!sameKeys(desired, keys)) {
+				showChecks(desired);
+			}
 		});
 		pick.onDidTriggerItemButton((e) => void open(e.item.key));
 		pick.onDidTriggerButton((button) => {
