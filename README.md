@@ -8,7 +8,7 @@ uses right now, give unused disk space back to Windows, back up the folders
 that matter, and start, stop, install, or move distros without breaking the
 tools and windows that depend on them.
 
-![The WSL Distro Manager view with the default distro expanded: live CPU, memory, and process count, OS and disk details, and about 8.4 GB of reclaimable disk space. Podman distros are labeled.](images/overview.png)
+![Demo: expanding a running distro shows live CPU and memory and about 8.3 GB of reclaimable disk space; the context menu opens, and Back Up Folders picks a folder from the home directory and the names to leave out.](images/demo.gif)
 
 WSL Distro Manager complements Microsoft's **WSL** extension
 ([`ms-vscode-remote.remote-wsl`](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-wsl)),
@@ -27,6 +27,8 @@ themselves.
 - State, WSL version, and default distro, refreshed automatically.
 - Expand a distro for its OS, kernel, default user, disk usage, install
   location, and virtual disk (VHDX) size.
+
+![The WSL Distro Manager view with the default distro expanded: live CPU, memory, and process count, OS and disk details, and about 8.4 GB of reclaimable disk space. Podman distros are labeled.](images/overview.png)
 
 **Reclaim disk space**
 - See how much space a distro's virtual disk holds beyond what it uses, and

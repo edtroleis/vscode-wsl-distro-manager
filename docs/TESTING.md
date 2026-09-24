@@ -104,6 +104,7 @@ publishing.
 
 | File | Shows |
 |---|---|
+| `demo.gif` | The top of the README: expanding a running distro (live metrics, reclaimable space), the context menu, and a backup. Under 5 MB, recorded with ScreenToGif at 12 fps. |
 | `overview.png` | Several distros, one expanded and running: live metrics, details, reclaimable VHDX space, Podman labels. |
 | `compact.png` | The VHDX row with reclaimable space and the *Compact Disk* confirmation. |
 | `compact-shutdown.png` | The confirmation to shut WSL down for a compaction. |
